@@ -69,6 +69,12 @@ def export(infile, outfile=None, producer="Unknown", graph_name="Unknown"):
         all_outputs.append(x)
 
     parameter_repeats = {}  # for shared params, decide whether to create new weight value for a parameter
+    def get_unique_param_name(name):
+        if name in parameter_repeats:
+            parameter_repeats[name] += 1
+            return name + str(repeats[name])
+        repeats[name] = 1
+        return name + str(repeats[name])
 
     # used to make sure we get a unique weight name + we can handle nested repeats
     # must return a different name from name even if it doesn't exist yet in the repeats dictionary
