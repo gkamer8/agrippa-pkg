@@ -1,0 +1,45 @@
+<model script-version="0.0.1">
+
+    <import dim="[3, 1]" from="input" type="float32" />
+
+    <block title="FFN" x="100" y="250" width="200" height="100">
+        <import from="input" />
+        <block title="FFN Layer" rep="5">
+            <import from="input" />
+            <node title="Linear" op="MatMul">
+                <params dim="[3, 3]" name="W" type="float32" />
+                <input dim="[3, 1]" src="input" />
+                <output dim="[3, 1]" name="linear" />
+            </node>
+            <node title="Bias" op="Add">
+                <params dim="[3, 1]" name="B" type="float32" />
+                <input dim="[3, 1]" src="linear" />
+                <output dim="[3, 1]" name="biased" />
+            </node>
+            <node title="ReLu" op="Relu">
+                <input dim="[3, 1]" src="biased" />
+                <output dim="[3, 1]" name="relu" />
+            </node>
+            <export from="relu" />
+        </block>
+        <export from="relu" />
+    </block>
+
+    <block title="Add + Norm" x="100" y="100" width="200" height="100">
+        <import from="relu" />
+        <import from="input" />
+        <node title="Add" op="Add">
+            <input dim="[3, 1]" src="relu" />
+            <input dim="[3, 1]" src="input" />
+            <output dim="[3, 1]" name="add" />
+        </node>
+        <node title="LayerNorm" op="LpNormalization" axis="0" p="1">
+            <input dim="[3, 1]" src="add" />
+            <output dim="[3, 1]" name="y" />
+        </node>
+        <export from="layer_norm" />
+    </block>
+
+    <export dim="[3, 1]" from="y" type="float32" />
+
+</model>

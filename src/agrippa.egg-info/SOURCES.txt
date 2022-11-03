@@ -1,0 +1,13 @@
+LICENSE
+MANIFEST.in
+README.md
+pyproject.toml
+src/agrippa/__init__.py
+src/agrippa/__main__.py
+src/agrippa/config.toml
+src/agrippa/parse.py
+src/agrippa.egg-info/PKG-INFO
+src/agrippa.egg-info/SOURCES.txt
+src/agrippa.egg-info/dependency_links.txt
+src/agrippa.egg-info/requires.txt
+src/agrippa.egg-info/top_level.txt
