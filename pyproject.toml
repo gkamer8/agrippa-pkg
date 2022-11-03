@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agrippa"
-version = "0.0.3"
+version = "0.1.0"
 description = "Making AI easier"
 readme = "README.md"
 authors = [{ name = "Gordon Kamer", email = "gkamer@outlook.com" }]
