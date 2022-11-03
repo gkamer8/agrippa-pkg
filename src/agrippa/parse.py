@@ -3,41 +3,71 @@ import onnx
 import json
 import numpy as np
 import os
+import pickle
 
-# In the future, should look for a weights file
-def _resolve_param(name, data_type, dims, weight_file):
+WEIGHTS_FNAME = "weights.pkl"
+META_FNAME = "meta.json"
 
+ONNX_TYPE_DICT = {
+    "float32": onnx.TensorProto.FLOAT
+}
+
+suppress_prints = False
+
+# For error statements
+def _notify(str):
+    global suppress_prints
+    if not suppress_prints:
+        print(str)
+
+
+def _resolve_param(name, data_type, dims, weights):
     dims = json.loads(dims)
+    if name in weights:
+        try:
+            tens = weights[name]
+            res = onnx.helper.make_tensor(
+                name=name,
+                data_type=data_type,
+                dims=dims,
+                vals=tens.flatten().tolist())
+            return res
+        except:
+            _notify(f"Error finding weight {name}; arbitarily initializing.")
 
-    # For now, just do initalization of 1s
-    tens = np.ones(dims)
+    _notify(f"Weight {name} not found; arbitrarily initializing")
+
+    tens = np.random.random(dims)
 
     res = onnx.helper.make_tensor(
             name=name,
             data_type=data_type,
             dims=dims,
             vals=tens.flatten().tolist())
+
+    weights[name] = tens  # weights is an object, so this is allowed
     return res
 
 """
-def export(infile, outfile=None, producer="Unknown", graph_name="Unknown")
+def export(infile, ...)
 
 This function is used to convert a project directory into an ONNX file.
 The infile parameter should be a directory.
 The outfile parameter defaults to your project name with a .onnx extension.
 
 """
-def export(infile, outfile=None, producer="Unknown", graph_name="Unknown"):
+def export(
+        infile,
+        outfile=None,
+        producer="Unknown",
+        graph_name="Unknown",
+        write_weights=True,
+        suppress=False
+    ):
 
-    ONNX_TYPE_DICT = {
-        "float32": onnx.TensorProto.FLOAT
-    }
-
-    def get_producer_name():
-        return producer
-
-    def get_graph_name():
-        return graph_name
+    global suppress_prints
+    suppress_prints = suppress
+    
 
     def get_output_model_name():
         if outfile:
@@ -57,33 +87,44 @@ def export(infile, outfile=None, producer="Unknown", graph_name="Unknown"):
     if not arch_file:
         raise FileNotFoundError("No model architecture file found. A file with .agr or .xml extension expected.")
 
-    # Look for a meta.json file
+    # Look for a meta file
     meta_file = None
     for fil in proj_dir:
         try:
-            if fil == "meta.json":
+            if fil == META_FNAME:
                 meta_file = fil
                 break
         except:
             pass
     if not meta_file:
-        print("No meta.json file found - using default metadata.")
+        _notify("No meta file found - using default metadata.")
+    else:
+        with open(os.path.join(infile, meta_file)) as fhand:
+            meta = json.load(fhand)
+            try:
+                producer = meta['producer']
+            except KeyError:
+                _notify("Meta file does not contain producer - using default.")
+            try:
+                graph_name = meta['graph_name']
+            except KeyError:
+                _notify("Meta file does not contain graph name - using default.")
 
-    # TODO: Load in producer/graph name
-
-    # Look for a weights.json file
+    # Look for a weights file
+    weights = {}
     weights_file = None
     for fil in proj_dir:
         try:
-            if fil == "weights.json":
+            if fil == WEIGHTS_FNAME:
                 weights_file = fil
                 break
         except:
             pass
     if not weights_file:
-        print("No weights file found - using arbitrary initialization.")
-
-    # TODO: Open file, and modify _resolve_param
+        _notify("No weights file found - using arbitrary initialization.")
+    else:
+        with open(os.path.join(infile, weights_file), "rb") as fhand:
+            weights = pickle.load(fhand)
 
     tree = ET.parse(os.path.join(infile, arch_file))  # should throw error if not well-formed XML
     root = tree.getroot()
@@ -121,9 +162,9 @@ def export(infile, outfile=None, producer="Unknown", graph_name="Unknown"):
     def get_unique_param_name(name):
         if name in parameter_repeats:
             parameter_repeats[name] += 1
-            return name + str(repeats[name])
-        repeats[name] = 1
-        return name + str(repeats[name])
+            return name + str(parameter_repeats[name])
+        parameter_repeats[name] = 1
+        return name + str(parameter_repeats[name])
 
     # used to make sure we get a unique weight name + we can handle nested repeats
     # must return a different name from name even if it doesn't exist yet in the repeats dictionary
@@ -190,7 +231,8 @@ def export(infile, outfile=None, producer="Unknown", graph_name="Unknown"):
                 dim = param.attrib['dim']
                 dtype = param.attrib['type']
                 if name not in parameter_repeats:  # What if we're (not) sharing a parameter?
-                    param_onnx = _resolve_param(name, ONNX_TYPE_DICT[dtype], dim, weights_file)
+                    # Important that the (ONNX) name is made final by here
+                    param_onnx = _resolve_param(name, ONNX_TYPE_DICT[dtype], dim, weights)
                     all_inits.append(param_onnx)
                     parameter_repeats[name] = 1
 
@@ -278,14 +320,14 @@ def export(infile, outfile=None, producer="Unknown", graph_name="Unknown"):
     # Create the graph (GraphProto)
     graph_def = onnx.helper.make_graph(
         nodes=all_nodes,
-        name=get_graph_name(),
+        name=graph_name,
         inputs=all_inputs,  # Graph input
         outputs=all_outputs,  # Graph output
         initializer=all_inits,
     )
 
     # Create the model (ModelProto)
-    model_def = onnx.helper.make_model(graph_def, producer_name=get_producer_name())
+    model_def = onnx.helper.make_model(graph_def, producer_name=producer)
     model_def.opset_import[0].version = 13
 
     model_def = onnx.shape_inference.infer_shapes(model_def)
@@ -293,3 +335,9 @@ def export(infile, outfile=None, producer="Unknown", graph_name="Unknown"):
     onnx.checker.check_model(model_def)
 
     onnx.save(model_def, get_output_model_name())
+
+    # Write the weights file if we're supposed to
+    if write_weights:
+        weights_path = os.path.join(infile, WEIGHTS_FNAME)
+        with open(weights_path, "wb") as fhand:
+            pickle.dump(weights, fhand)

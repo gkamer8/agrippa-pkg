@@ -2,15 +2,41 @@
 
 This python package is meant to assist in building/understanding/analyzing machine learning models. The core of the system is a markup language that can be used to specify a model architecture. This package contains utilities to convert that language into the ONNX format, which is compatibly with a variety of deployment options and ML frameworks.
 
-## Installation
+# Installation
 
 Agrippa can be installed with `pip install agrippa`. The `requirements.txt` file contains dependencies to run both the package and the tests found in the `tests` folder.
+
+# Usage
+
+The principal function is export, which takes a project folder and compiles the contents into a .onnx file.
+
+```
+import agrippa
+
+model_dir = '../path/to/dir'
+agrippa.export(model_dir, 'outfile_name.onnx')
+```
+
+The function header for export is:
+
+```
+def export(
+        infile,
+        outfile=None,
+        producer="Unknown",
+        graph_name="Unknown",
+        write_weights=True,
+        suppress=False
+    ):
+```
+
+The outfile parameter defaults to the infile with a .onnx extension. The `suppress` variable controls whether export will print anything.
 
 # Markup Language Spec
 
 A project should be bundled into its own directory, which should have three files:
-1. A file with the extension `.agr` or `.xml` specifying the model architecture
-2. A `weights.json` file to specify the parameter values in the model (optional)
+1. One file with the extension `.agr` or `.xml` specifying the model architecture
+2. A `weights.pkl` file to specify the parameter values in the model (optional)
 3. A `meta.json` file to define certain metadata, like the producer name (optional)
 
 The architecture file is parsed like XML, so it should be well-formed XML. Recall that tags with no respective end-tag should end with ` \>`, and all attributes should be formatted like strings with quotes around them.
