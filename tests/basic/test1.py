@@ -6,7 +6,7 @@ import onnxruntime as ort
 import numpy as np
 
 # Conver xml to onnx
-agrippa.export('default.xml', 'testing.onnx')
+agrippa.export('default-project', 'testing.onnx')
 
 # Attempt to run
 x = np.random.random((3, 1)).astype("float32")

@@ -2,8 +2,31 @@ import xml.etree.ElementTree as ET
 import onnx
 import json
 import numpy as np
+import os
 
+# In the future, should look for a weights file
+def _resolve_param(name, data_type, dims, weight_file):
 
+    dims = json.loads(dims)
+
+    # For now, just do initalization of 1s
+    tens = np.ones(dims)
+
+    res = onnx.helper.make_tensor(
+            name=name,
+            data_type=data_type,
+            dims=dims,
+            vals=tens.flatten().tolist())
+    return res
+
+"""
+def export(infile, outfile=None, producer="Unknown", graph_name="Unknown")
+
+This function is used to convert a project directory into an ONNX file.
+The infile parameter should be a directory.
+The outfile parameter defaults to your project name with a .onnx extension.
+
+"""
 def export(infile, outfile=None, producer="Unknown", graph_name="Unknown"):
 
     ONNX_TYPE_DICT = {
@@ -21,22 +44,48 @@ def export(infile, outfile=None, producer="Unknown", graph_name="Unknown"):
             return outfile
         return infile + ".onnx"
 
-    # In the future, should look for a weights file
-    def resolve_param(name, data_type, dims):
+    proj_dir = os.listdir(infile)
+    arch_file = None
+    for fil in proj_dir:
+        try:
+            if fil[-4:] == ".xml" or fil[-4:] == ".agr":
+                arch_file = fil
+                break
+        except:
+            pass 
 
-        dims = json.loads(dims)
+    if not arch_file:
+        raise FileNotFoundError("No model architecture file found. A file with .agr or .xml extension expected.")
 
-        # For now, just do initalization of 1s
-        tens = np.ones(dims)
+    # Look for a meta.json file
+    meta_file = None
+    for fil in proj_dir:
+        try:
+            if fil == "meta.json":
+                meta_file = fil
+                break
+        except:
+            pass
+    if not meta_file:
+        print("No meta.json file found - using default metadata.")
 
-        res = onnx.helper.make_tensor(
-                name=name,
-                data_type=data_type,
-                dims=dims,
-                vals=tens.flatten().tolist())
-        return res
+    # TODO: Load in producer/graph name
 
-    tree = ET.parse(infile)
+    # Look for a weights.json file
+    weights_file = None
+    for fil in proj_dir:
+        try:
+            if fil == "weights.json":
+                weights_file = fil
+                break
+        except:
+            pass
+    if not weights_file:
+        print("No weights file found - using arbitrary initialization.")
+
+    # TODO: Open file, and modify _resolve_param
+
+    tree = ET.parse(os.path.join(infile, arch_file))  # should throw error if not well-formed XML
     root = tree.getroot()
 
     # Get root imports/exports
@@ -94,8 +143,7 @@ def export(infile, outfile=None, producer="Unknown", graph_name="Unknown"):
         repeat_node_names[name] = 1
         return name + str(repeat_node_names[name])
 
-    block_id_tracker = {'curr': 0}
-
+    block_id_tracker = {'curr': 0}  # A hack to not technically use a global var
     def make_unique_block_id():
         block_id_tracker['curr'] += 1
         return block_id_tracker['curr']
@@ -105,6 +153,8 @@ def export(infile, outfile=None, producer="Unknown", graph_name="Unknown"):
 
     name_resolves = {}  # an important data structure for dealing with repetitions and the resulting name changes
 
+    # How many programming sins can we commit in the shortest amount of code?
+    # A hellish mix of state and functional programming.
     def parse_block(block, block_id, rep_index=0):
 
         # Go through each node in the block
@@ -129,14 +179,18 @@ def export(infile, outfile=None, producer="Unknown", graph_name="Unknown"):
                 # Note: order can be important!
                 # Each op type specifies the order in which inputs are meant to be included
                 name = param.attrib['name']
-                if True:  # TODO: deal with weight sharing
-                    name = get_unique_name(name)
+                try:
+                    shared = param.attrib['shared']
+                except:
+                    shared = "no"
+                if shared == "no":
+                    name = get_unique_param_name(name)
                 params.append(name)
 
                 dim = param.attrib['dim']
                 dtype = param.attrib['type']
                 if name not in parameter_repeats:  # What if we're (not) sharing a parameter?
-                    param_onnx = resolve_param(name, ONNX_TYPE_DICT[dtype], dim)
+                    param_onnx = _resolve_param(name, ONNX_TYPE_DICT[dtype], dim, weights_file)
                     all_inits.append(param_onnx)
                     parameter_repeats[name] = 1
 

@@ -7,12 +7,12 @@
         <block title="FFN Layer" rep="5">
             <import from="input" />
             <node title="Linear" op="MatMul">
-                <params dim="[3, 3]" name="W" type="float32" />
+                <params dim="[3, 3]" name="W" type="float32" shared="no" />
                 <input dim="[3, 1]" src="input" />
                 <output dim="[3, 1]" name="linear" />
             </node>
             <node title="Bias" op="Add">
-                <params dim="[3, 1]" name="B" type="float32" />
+                <params dim="[3, 1]" name="B" type="float32" shared="no" />
                 <input dim="[3, 1]" src="linear" />
                 <output dim="[3, 1]" name="biased" />
             </node>
