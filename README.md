@@ -1,6 +1,6 @@
 # Agrippa
 
-This python package is meant to assist in building/understanding/analyzing machine learning models. The core of the system is a markup language that can be used to specify a model architecture. This package contains utilities to convert that language into the ONNX format, which is compatibly with a variety of deployment options and ML frameworks.
+This python package is meant to assist in building/understanding/analyzing machine learning models. The core of the system is a markup language that can be used to specify a model architecture. This package contains utilities to convert that language into the ONNX format, which is compatible with a variety of deployment options and ML frameworks.
 
 # Installation
 
@@ -100,6 +100,31 @@ If you'd like to use the extension `.agr` for clarity, you can enable syntax hig
 }
 ```
 To create that settings file, use the command pallet (CTRL-SHIFT-P), type `settings.json`, and choose the appropriate option.
+
+# Training
+
+ONNX is built for inference. However, various supporters of ONNX, including Microsoft (via the onnxruntime), have tried to implement training support. As far as I can tell, Microsoft gave up on trying to support training ONNX files directly. Many of the training tools in onnxruntime are either experimental or scheduled to be depricated. What they did end up implementing was a tool to train PyTorch models (i.e. objects of classes that inherit from torch.nn.Module). Their tool is more narrowly for speeding up training that you could already do natively in PyTorch, and it is not used in this project.
+
+Another option, besides trying to rely on existing ONNX training projects, would have been to make our own. It is actually relatively straightforward: the ONNX file itself is a highly expressive computational graph. We could build a separate graph for training, which has gradient nodes added. It could even take parameters as input and output new parameters while keeping all the data on a GPU. The key is having access to (or building from scratch) nodes that can compute the gradient of each operation (there are many, but they are relatively simple). I ultimately decided (like Microsoft) that this was not worth the pain.
+
+Instead, we opt for converting onnx files to PyTorch. We provide utilities to do that and to use the training features of PyTorch.
+
+Unfortunately, PyTorch does not natively support importing ONNX files. But there is a work-around: building on top of some community tools, we can make our own ONNX to PyTorch converter that is suitable for training. There is more information in the README.md under src/agrippa/onnx2torch for details on exactly how a particular community project was modified. It does not support all ONNX operations, but neither does our markup language.
+
+## Usage
+
+The following code snippet takes a project directory, converts it to an onnx file, then uses the build-in ONNX-to-PyTorch converter to create a PyTorch model, which can be trained in the usual way.
+
+```
+import agrippa
+
+proj_name = 'simple-project'
+onnx_out = 'simple_testing.onnx'
+
+agrippa.export(proj_name, onnx_out)
+
+torch_model = agrippa.onnx_to_torch(onnx_out)
+```
 
 # Examples
 

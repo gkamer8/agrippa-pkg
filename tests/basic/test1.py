@@ -17,13 +17,13 @@ agrippa.export('default-project', 'testing.onnx', suppress=True)
 
 # Attempt to run
 x = np.random.random((3, 1)).astype("float32")
-ort_sess = ort.InferenceSession('testing.onnx')
+ort_sess = ort.InferenceSession('testing.onnx', providers=['CPUExecutionProvider'])
 outputs = ort_sess.run(None, {'input': x})
 
 # Convert again (should be using the same weights)
 agrippa.export('default-project', 'testing.onnx', suppress=True)
 # Attempt to run
-ort_sess = ort.InferenceSession('testing.onnx')
+ort_sess = ort.InferenceSession('testing.onnx', providers=['CPUExecutionProvider'])
 outputs2 = ort_sess.run(None, {'input': x})
 
 np.testing.assert_array_equal(outputs,

@@ -1,0 +1,30 @@
+<model script-version="0.0.1">
+
+    <import dim="[3, 1]" from="input" type="float32" />
+
+    <block title="FFN" x="100" y="250" width="200" height="100">
+        <import from="input" />
+        <block title="FFN Layer" rep="5">
+            <import from="input" />
+            <node title="Linear" op="MatMul">
+                <params dim="[3, 3]" name="W" type="float32" shared="no" />
+                <input dim="[3, 1]" src="input" />
+                <output dim="[3, 1]" name="linear" />
+            </node>
+            <node title="Bias" op="Add">
+                <params dim="[3, 1]" name="B" type="float32" shared="no" />
+                <input dim="[3, 1]" src="linear" />
+                <output dim="[3, 1]" name="biased" />
+            </node>
+            <node title="ReLu" op="Relu">
+                <input dim="[3, 1]" src="biased" />
+                <output dim="[3, 1]" name="y" />
+            </node>
+            <export from="y" />
+        </block>
+        <export from="y" />
+    </block>
+
+    <export dim="[3, 1]" from="y" type="float32" />
+
+</model>
