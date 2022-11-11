@@ -89,10 +89,10 @@ The currently supported op types are:
 
 | ONNX OpType | ONNX Compile Support | PyTorch Training Support |
 | ----------- | -------------------- |--------------------------|
-| Add         | [x]                  | [x]                      |
-| MatMul      | [x]                  | [x]                      |
-| LpNormalization | [x]              | [x]                      |
-| Relu        | [x]                  | [x]                      |
+| Add         | -[x]                  | -[x]                      |
+| MatMul      | -[x]                  | -[x]                      |
+| LpNormalization | -[x]              | -[x]                      |
+| Relu        | -[x]                  | -[x]                      |
 
 ## Syntax Highlighting in VSCode
 
