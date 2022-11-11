@@ -87,12 +87,12 @@ The only currently supported type is `float32`.
 The currently supported op types are:
 
 
-| ONNX OpType | ONNX Compile Support | PyTorch Training Support |
-| ----------- | -------------------- |--------------------------|
-| Add         | -[x]                  | -[x]                      |
-| MatMul      | -[x]                  | -[x]                      |
-| LpNormalization | -[x]              | -[x]                      |
-| Relu        | -[x]                  | -[x]                      |
+| ONNX OpType | ONNX Compile Support               | PyTorch Training Support |
+| ----------- | ---------------------------------- |--------------------------|
+| Add         | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
+| MatMul      | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
+| LpNormalization | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
+| Relu        | <span style=color:green>Yes</span> |<span style=color:green>Yes</span>|
 
 ## Syntax Highlighting in VSCode
 
