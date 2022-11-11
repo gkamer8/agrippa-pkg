@@ -20,6 +20,7 @@ from agrippa.onnx2torch.node_converters.gemm import *
 from agrippa.onnx2torch.node_converters.global_average_pool import *
 from agrippa.onnx2torch.node_converters.identity import *
 from agrippa.onnx2torch.node_converters.logical import *
+from agrippa.onnx2torch.node_converters.lpnormalization import *
 from agrippa.onnx2torch.node_converters.lrn import *
 from agrippa.onnx2torch.node_converters.matmul import *
 from agrippa.onnx2torch.node_converters.max_pool import *

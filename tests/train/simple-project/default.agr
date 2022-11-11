@@ -18,6 +18,14 @@
             </node>
             <node title="ReLu" op="Relu">
                 <input dim="[3, 1]" src="biased" />
+                <output dim="[3, 1]" name="relu" />
+            </node>
+            <export from="relu" />
+        </block>
+        <block title="Norm">
+            <import from="relu" />
+            <node title="ReLu" op="LpNormalization" axis="0" p="1">
+                <input dim="[3, 1]" src="relu" />
                 <output dim="[3, 1]" name="y" />
             </node>
             <export from="y" />
