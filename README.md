@@ -93,6 +93,7 @@ The currently supported op types are:
 | MatMul      | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
 | LpNormalization | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
 | Relu        | <span style=color:green>Yes</span> |<span style=color:green>Yes</span>|
+| Transpose   | <span style=color:green>Yes</span> |<span style=color:green>Yes</span>|
 
 ## Syntax Highlighting in VSCode
 

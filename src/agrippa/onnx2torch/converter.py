@@ -144,7 +144,7 @@ def convert(  # pylint: disable=too-many-locals, too-many-branches, too-many-sta
                 # The name of pytorch buffer must not contain '.'(dot)
                 len_torch_initializers = sum(1 for _ in torch_initializers.parameters())
                 # The above used to be sum(1 for _ in torch_initializers.buffers())
-                torch_buffer_name = f'{value_name}_{len_torch_initializers}'
+                torch_buffer_name = f'{value_name}'
                 if value_name not in torch_nodes:
                     torch_initializers.add_initializer(
                         torch_buffer_name,

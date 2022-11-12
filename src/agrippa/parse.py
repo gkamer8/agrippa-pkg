@@ -62,7 +62,8 @@ def export(
         producer="Unknown",
         graph_name="Unknown",
         write_weights=True,
-        suppress=False
+        suppress=False,
+        reinit=False
     ):
 
     global suppress_prints
@@ -122,6 +123,8 @@ def export(
             pass
     if not weights_file:
         _notify("No weights file found - using arbitrary initialization.")
+    elif reinit:
+        print("Re-initializing weights, as per your request.")
     else:
         with open(os.path.join(infile, weights_file), "rb") as fhand:
             weights = pickle.load(fhand)
@@ -164,7 +167,7 @@ def export(
             parameter_repeats[name] += 1
             return name + str(parameter_repeats[name])
         parameter_repeats[name] = 1
-        return name + str(parameter_repeats[name])
+        return name
 
     # used to make sure we get a unique weight name + we can handle nested repeats
     # must return a different name from name even if it doesn't exist yet in the repeats dictionary
@@ -174,7 +177,7 @@ def export(
             repeats[name] += 1
             return name + str(repeats[name])
         repeats[name] = 1
-        return name + str(repeats[name])
+        return name
 
     repeat_node_names = {}
     def get_unique_node_name(name):
@@ -182,7 +185,7 @@ def export(
             repeat_node_names[name] += 1
             return name + str(repeat_node_names[name])
         repeat_node_names[name] = 1
-        return name + str(repeat_node_names[name])
+        return name
 
     block_id_tracker = {'curr': 0}  # A hack to not technically use a global var
     def make_unique_block_id():
@@ -200,7 +203,10 @@ def export(
 
         # Go through each node in the block
         for node in block.findall('node'):
-            op = node.attrib['op']
+            try:
+                op = node.attrib['op']
+            except KeyError:
+                raise SyntaxError("Op type not specified for some node")
             title = node.attrib['title']
             title = get_unique_node_name(title)
             
@@ -219,41 +225,52 @@ def export(
             for param in param_els:
                 # Note: order can be important!
                 # Each op type specifies the order in which inputs are meant to be included
-                name = param.attrib['name']
+                orig_name = param.attrib['name']
+                name = orig_name
                 try:
                     shared = param.attrib['shared']
                 except:
                     shared = "no"
-                if shared == "no":
-                    name = get_unique_param_name(name)
-                params.append(name)
-
+                
                 dim = param.attrib['dim']
                 dtype = param.attrib['type']
-                if name not in parameter_repeats:  # What if we're (not) sharing a parameter?
-                    # Important that the (ONNX) name is made final by here
+
+                if shared == "no":
+                    name = get_unique_param_name(orig_name)
                     param_onnx = _resolve_param(name, ONNX_TYPE_DICT[dtype], dim, weights)
                     all_inits.append(param_onnx)
-                    parameter_repeats[name] = 1
+                else:
+                    # First time we see it, even if we keep the name, need to initialize
+                    if name not in parameter_repeats:
+                        param_onnx = _resolve_param(name, ONNX_TYPE_DICT[dtype], dim, weights)
+                        all_inits.append(param_onnx)
+                        parameter_repeats[name] = 1  # so we don't do this next time
+                params.append(name)
 
             kwargs = {}
             # Sometimes there are other tags defining certain attributes
             # Here is where we would need to support new op types
             if op == 'MatMul':
                 inputs = params + inputs
-            if op == "Add":
+            elif op == "Add":
                 inputs = params + inputs
-            if op == "Relu":
+            elif op == "Relu":
                 pass
-            if op == "LpNormalization":
+            elif op == "LpNormalization":
                 kwargs["axis"] = int(node.attrib['axis'])
                 kwargs["p"] = int(node.attrib['p'])
-            if op == "Transpose":
+                inputs = params + inputs  # you can transpose params
+                if len(inputs) > 1:
+                    raise SyntaxWarning(f"LpNormalization should only have one input, yet it has {len(inputs)}")
+            elif op == "Transpose":
                 try:
                     perm = node.attrib['perm']
                     kwargs["perm"] = json.loads(perm)
                 except KeyError:
                     pass  # Default perm value, which is reverse
+                inputs = params + inputs  # you can transpose params
+                if len(inputs) > 1:
+                    raise SyntaxWarning(f"Transpose should only have one input, yet it has {len(inputs)}")
 
             new_node = onnx.helper.make_node(
                 name=title,

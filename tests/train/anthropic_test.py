@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 proj_name = 'anthropic-proj'
 onnx_out = 'anthropic.onnx'
 
-agrippa.export(proj_name, onnx_out)
+agrippa.export(proj_name, onnx_out, reinit=True)
 
 torch_model = agrippa.onnx_to_torch(onnx_out)
 
@@ -33,10 +33,10 @@ losses = []
 def optimize(model,
              importance,
              steps=100_000,
-             print_freq=1000,
+             print_freq=10_000,
              lr=5e-5,
              sparsity=.7,
-             log_freq=100):
+             log_freq=1_000):
     
     opt = torch.optim.AdamW(list(model.parameters()), lr=lr)
 
@@ -68,26 +68,49 @@ def gen_importance(exp=.5):
     return importance
 
 importance = gen_importance()
-print(importance)
-final_params = optimize(torch_model, importance)
 
-print(f"Final W:")
-w1_name = [x for x in final_params if x.split(".")[1].split("_")[0]=='W1'][0]
-wt_name = [x for x in final_params if x.split(".")[1].split("_")[0]=='WT1'][0]
-print(final_params[w1_name])
-print(final_params[wt_name])
+
+final_params = {}
+if True:  # large
+    final_params = optimize(torch_model, importance)
+else:  # small
+    final_params = optimize(torch_model, importance, steps=100, print_freq=20, log_freq=1)
+
+print("W:")
+print(final_params['initializers.W'])
+
+print("(WT)(W):")
+print(torch.matmul(torch.transpose(final_params['initializers.W'], 0, 1), final_params['initializers.W']))
+
+print("b:")
+print(final_params['initializers.b'])
 
 print("Test x:")
 
 test_x = torch.tensor([[.7], [.0], [.3]])
 print(test_x)
 out = torch_model(test_x)[0]
+print("out:")
 print(out)
 
 error = (importance*(test_x.abs() - out)**2)
 
 loss = error.sum()
+print("Loss:")
 print(loss.item())
 
 plt.plot(losses)
+plt.show()
+
+x1 = final_params['initializers.W'][0, 0]
+y1 = final_params['initializers.W'][1, 0]
+
+x2 = final_params['initializers.W'][0, 1]
+y2 = final_params['initializers.W'][1, 1]
+
+plt.plot([0, x1], [0, y1])
+plt.plot([0, x2], [0, y2])
+plt.xlim(-1, 1)
+plt.ylim(-1, 1)
+
 plt.show()

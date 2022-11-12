@@ -5,7 +5,7 @@
     <block title="Down Projection">
         <import from="input" />
         <node title="Linear" op="MatMul">
-            <params dim="[2, 3]" name="W" type="float32" shared="no" />
+            <params dim="[2, 3]" name="W" type="float32" shared="yes" />
             <input dim="[3, 1]" src="input" />
             <output dim="[2, 1]" name="down" />
         </node>
@@ -14,8 +14,12 @@
 
     <block title="Up Projection">
         <import from="down" />
+        <node title="WeightTranspose" op="Transpose">
+            <params dim="[2, 3]" name="W" type="float32" shared="yes" />
+            <output dim="[3, 2]" name="WT" />
+        </node>
         <node title="Linear" op="MatMul">
-            <params dim="[3, 2]" name="WT" type="float32" shared="no" />
+            <input dim="[3, 2]" src="WT" />
             <input dim="[2, 1]" src="down" />
             <output dim="[3, 1]" name="linear2" />
         </node>
