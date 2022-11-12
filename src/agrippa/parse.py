@@ -246,9 +246,14 @@ def export(
             if op == "Relu":
                 pass
             if op == "LpNormalization":
-                kwargs["axis"] = int(node.attrib['axis'])  # -1 means last; note that in a 2d system, 0 is row wise, 1 is column wise
-                kwargs["p"] = int(node.attrib['p'])  # I think it's L1 norm?
-
+                kwargs["axis"] = int(node.attrib['axis'])
+                kwargs["p"] = int(node.attrib['p'])
+            if op == "Transpose":
+                try:
+                    perm = node.attrib['perm']
+                    kwargs["perm"] = json.loads(perm)
+                except KeyError:
+                    pass  # Default perm value, which is reverse
 
             new_node = onnx.helper.make_node(
                 name=title,

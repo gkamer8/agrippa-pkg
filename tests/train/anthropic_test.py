@@ -6,6 +6,7 @@ import agrippa
 import onnxruntime as ort
 
 import torch
+import matplotlib.pyplot as plt
 
 # Recreate the anthropic thing sort of
 
@@ -27,18 +28,22 @@ def generate_input(features, feature_probability):
 
 features = 3
 
+losses = []
+
 def optimize(model,
              importance,
-             steps=100,
-             print_freq=10,
-             lr=1e-3,
-             sparsity=.5):
+             steps=100_000,
+             print_freq=1000,
+             lr=5e-5,
+             sparsity=.7,
+             log_freq=100):
     
     opt = torch.optim.AdamW(list(model.parameters()), lr=lr)
 
     for step in range(steps):
-        batch = generate_input(features, sparsity)
+        opt.zero_grad()
 
+        batch = generate_input(features, sparsity)
         out = model(batch)[0]  # recall first is final output, second is intermediate output
 
         error = (importance*(batch.abs() - out)**2)
@@ -50,14 +55,39 @@ def optimize(model,
 
         if step % print_freq == 0:
             print(f"At step {step+1}/{steps}")
+
+        if step % log_freq == 0:
+            losses.append(loss.item())
     
-    print(f"Final parameters: {model.state_dict()}")
+    return model.state_dict()
 
 
 def gen_importance(exp=.5):
     # Expotential feature importance
-    importance = exp**torch.arange(features)
+    importance = torch.tensor([[exp**i] for i in range(features)])
     return importance
 
 importance = gen_importance()
-optimize(torch_model, importance)
+print(importance)
+final_params = optimize(torch_model, importance)
+
+print(f"Final W:")
+w1_name = [x for x in final_params if x.split(".")[1].split("_")[0]=='W1'][0]
+wt_name = [x for x in final_params if x.split(".")[1].split("_")[0]=='WT1'][0]
+print(final_params[w1_name])
+print(final_params[wt_name])
+
+print("Test x:")
+
+test_x = torch.tensor([[.7], [.0], [.3]])
+print(test_x)
+out = torch_model(test_x)[0]
+print(out)
+
+error = (importance*(test_x.abs() - out)**2)
+
+loss = error.sum()
+print(loss.item())
+
+plt.plot(losses)
+plt.show()

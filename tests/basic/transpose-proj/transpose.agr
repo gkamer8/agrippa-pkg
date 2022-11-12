@@ -1,0 +1,16 @@
+<model script-version="0.0.1">
+
+    <import dim="[3, 3, 3, 3]" from="input" type="float32" />
+
+    <block title="Transpose">
+        <import from="input" type="float32" />
+        <node title="trans" op="Transpose" perm="[0, 1, 3, 2]">
+            <input dim="[3, 3, 3, 3]" src="input" />
+            <output dim="[3, 3, 3, 3]" name="y" />
+        </node>
+        <export from="y" type="float32" />
+    </block>
+
+    <export dim="[3, 3, 3, 3]" from="y" type="float32" />
+
+</model>
