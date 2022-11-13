@@ -15,14 +15,14 @@ import json
 
 proj_name = 'anthropic-proj'
 onnx_out = 'anthropic.onnx'
-features = 3
+features = 5
 bindings = {'features': str(features)}
 
 agrippa.export(proj_name, onnx_out, reinit=True, bindings=bindings)
 
 torch_model = agrippa.onnx_to_torch(onnx_out)
 
-def generate_input(features, feature_probability, nbatch=20):
+def generate_input(features, feature_probability, nbatch=1024):
     feat = torch.rand((nbatch, features, 1))
     batch = torch.where(
         torch.rand((nbatch, features, 1)) <= feature_probability,
@@ -35,11 +35,11 @@ losses = []
 
 def optimize(model,
              importance,
-             steps=100_000,
-             print_freq=10_000,
-             lr=5e-5,
-             sparsity=.8,
-             log_freq=1_000):
+             steps=10_000,
+             print_freq=100,
+             lr=1e-3,
+             sparsity=.01,
+             log_freq=10):
     
     opt = torch.optim.AdamW(list(model.parameters()), lr=lr)
 
@@ -74,7 +74,7 @@ importance = gen_importance()
 
 
 final_params = {}
-if False:  # large
+if True:  # large
     final_params = optimize(torch_model, importance)
 else:  # small
     final_params = optimize(torch_model, importance, steps=100, print_freq=20, log_freq=1)
