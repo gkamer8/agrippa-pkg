@@ -21,16 +21,16 @@ The function header for export is:
 
 ```
 def export(
-        infile,
-        outfile=None,
-        producer="Unknown",
-        graph_name="Unknown",
-        write_weights=True,
-        suppress=False
+        infile,  # the markup file
+        outfile=None,  # the .onnx file name
+        producer="Unknown",  # your name
+        graph_name="Unknown",  # the name of the model
+        write_weights=True,  # should this create a weights file, should none exist
+        suppress=False,  # suppresses certain print statements
+        reinit=False,  # reinitializes all weights from the weights file
+        bindings=None  # a dictionary to bind variables present in the markup
     ):
 ```
-
-The outfile parameter defaults to the infile with a .onnx extension. The `suppress` variable controls whether export will print anything.
 
 # Markup Language Spec
 
@@ -44,6 +44,24 @@ The architecture file is parsed like XML, so it should be well-formed XML. Recal
 ## Markup Syntax
 
 Every architecture file should be encased in a `<model>` tag, ideally with an attribute `script-version="0.0.0"` (the current version).
+
+An example script that does only one matrix multiply might look like this:
+
+```
+<model script-version="0.0.1">
+    <import dim="[5, 1]" from="input" type="float32" />
+    <block title="Projection">
+        <import from="input" />
+        <node title="Linear" op="MatMul">
+            <params dim="[5, 5]" name="W" type="float32" />
+            <input dim="[var(features), 1]" src="input" />
+            <output dim="[5, 1]" name="y" />
+        </node>
+        <export from="y" />
+    </block>
+    <export dim="[5, 1]" from="y" type="float32" />
+</model>
+```
 
 There are only three types of root-level tags that are allowed: `<import>`, `<export>`, and `<block>`. The import and export tags specify the inputs and outputs of the entire model, respectively. There may be multiple of each type, but each type must appear at least once. Each import and export tag must have three attributes: `dim`, `from`, and `type`. They are used like so:
 
@@ -66,15 +84,19 @@ Nodes define operations. Their `op` attribute defines the ONNX op type they will
 </node>
 ```
 
-Parameters, which are specified using the `<params>` tag, take a `name` attribute (unique only for non-shared parameters), a `dim` attribute, a `type` attribute, and an optional `shared` attribute. The `shared` attribute should equal "yes" or "no".
+Parameters, which are specified using the `<params>` tag, take a `name` attribute (unique only for non-shared parameters), a `dim` attribute, a `type` attribute, and an optional `shared` attribute. The `shared` attribute should equal "yes" or "no". It specifies whether a parameter name is meant to be unique; by default, parameters which share the same name (such as in a repitition) become independent values upon compilation.
 
 ## Repetitions
 
 Blocks may take a `rep` attribute, which defines how many times a block should be stacked on top of itself. Its outputs are passed to its inputs and so on. The number of inputs and the number of outputs need not match (they are matched based on order; note that if you want to use intermediate outputs, you must account for name mangling in repeated blocks). Even though the names of the outputs are mangled during repetitions, you may use the outputs in your markup with consideration to that fact: simply refer back to the name you specified, which is automatically mapped to the last name in the repetition.
 
+## Variable Bindings
+
+The `agrippa.export` function takes an optional argument, `bindings`. The `bindings` parameter is meant to be a dictionary of variables, set by the user, to replace areas in the markup file where the `var` function is used. For example, if an input tag has a `dim` attribute set to `"[var(image_width), var(image_height)]"`, a binding of `{'image_width': '512', 'image_height': '256'}` would set all occurances of `var(image_height)` to `512` and all occurances of `var(image_height)` to `256`. Note that in all cases, strings are used, since xml attributes require strings.
+
 ## Other Rules
 
-Each node in your file must have a unique title (name in ONNX). If it is inside a repeated block, the title will be mangled when it is converted to ONNX. Similarly, repeated output names will also be mangled. Parameter names should be unique only when they are not shared parameters; parameters inside repeated blocks will have their names mangled. Currently, name mangling simply appends an index to the name starting with 1. Name mangling affects parameters, node titles, and output/input names separately.
+Each node in your file must have a unique title (name in ONNX). If it is inside a repeated block, the title will be mangled when it is converted to ONNX. Similarly, repeated output names will also be mangled. Parameter names should be unique only when they are not shared parameters; parameters inside repeated blocks will have their names mangled so that they are unique. Name mangling affects parameters, node titles, and output/input names separately.
 
 Any behavior not mentioned here is undefined.
 
@@ -133,4 +155,46 @@ torch_model = agrippa.onnx_to_torch(onnx_out)
 
 # Examples
 
-You can find example projects inside the `tests` folder.
+The following architecture is a simple feed forward network with five layers followed by a normalization. The architecture is organized into two blocks, the FFN and the norm layer. Inside the FFN is a FFN Layer block, which is repeated five times.
+
+```
+<model script-version="0.0.1">
+
+    <import dim="[3, 1]" from="input" type="float32" />
+
+    <block title="FFN">
+        <import from="input" />
+        <block title="FFN Layer" rep="5">
+            <import from="input" />
+            <node title="Linear" op="MatMul">
+                <params dim="[3, 3]" name="W" type="float32" />
+                <input dim="[3, 1]" src="input" />
+                <output dim="[3, 1]" name="linear" />
+            </node>
+            <node title="Bias" op="Add">
+                <params dim="[3, 1]" name="B" type="float32" />
+                <input dim="[3, 1]" src="linear" />
+                <output dim="[3, 1]" name="biased" />
+            </node>
+            <node title="ReLu" op="Relu">
+                <input dim="[3, 1]" src="biased" />
+                <output dim="[3, 1]" name="relu" />
+            </node>
+            <export from="relu" />
+        </block>
+    </block>
+    <block title="Norm">
+        <import from="relu" />
+        <node title="ReLu" op="LpNormalization" axis="0" p="1">
+            <input dim="[3, 1]" src="relu" />
+            <output dim="[3, 1]" name="y" />
+        </node>
+        <export from="y" />
+    </block>
+ 
+    <export dim="[3, 1]" from="y" type="float32" />
+
+</model>
+```
+
+You can find more example projects inside the `tests` folder.
