@@ -1,0 +1,38 @@
+Gordon Kamer:
+ 
+W
+inputdownLinear"MatMul
+#
+WWTWeightTranspose"	Transpose
+$
+WT
+downlinear2Linear2"MatMul
+
+b
+linear2biasedBias"Add
+
+biasedyReLu"Relu	Anthropic*#"ƒ§û>þ@Ë>ºÀi?Ñýü>†›>	—§>BW*":?ÿ…?õ°‘=BbZ
+input
+
+
+b
+y
+
+
+b
+down
+
+
+j
+WT
+
+
+j
+linear2
+
+
+j
+biased
+
+
+B

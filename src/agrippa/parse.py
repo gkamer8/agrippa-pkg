@@ -1,3 +1,4 @@
+from math import exp
 import xml.etree.ElementTree as ET
 import onnx
 import json
@@ -14,15 +15,23 @@ ONNX_TYPE_DICT = {
 
 suppress_prints = False
 
-# For error statements
+# For print statements
 def _notify(str):
     global suppress_prints
     if not suppress_prints:
         print(str)
 
+# Variables in the file need to be of the form var(myVarName)
+def _resolve_attr(text, bindings, expect_value=True):
+    if bindings:
+        for key in bindings:
+            text = text.replace("var("+key+")", bindings[key])
+    if expect_value:
+        return json.loads(text)
+    return text
+
 
 def _resolve_param(name, data_type, dims, weights):
-    dims = json.loads(dims)
     if name in weights:
         try:
             tens = weights[name]
@@ -63,7 +72,8 @@ def export(
         graph_name="Unknown",
         write_weights=True,
         suppress=False,
-        reinit=False
+        reinit=False,
+        bindings=None
     ):
 
     global suppress_prints
@@ -141,10 +151,9 @@ def export(
 
     # Root model imports
     for child in root.findall("import"):
-        name = child.attrib['from']
-        child_type = child.attrib['type']
-        dim = child.attrib['dim']
-        dim = json.loads(dim)
+        name = _resolve_attr(child.attrib['from'], bindings, expect_value=False)
+        child_type = _resolve_attr(child.attrib['type'], bindings, expect_value=False)
+        dim = _resolve_attr(child.attrib['dim'], bindings, expect_value=True)
         x = onnx.helper.make_tensor_value_info(name,
                                             ONNX_TYPE_DICT[child_type],
                                             dim)
@@ -152,10 +161,9 @@ def export(
 
     # Root model exports
     for child in root.findall("export"):
-        name = child.attrib['from']
-        child_type = child.attrib['type']
-        dim = child.attrib['dim']
-        dim = json.loads(dim)
+        name = _resolve_attr(child.attrib['from'], bindings, expect_value=False)
+        child_type = _resolve_attr(child.attrib['type'], bindings, expect_value=False)
+        dim = _resolve_attr(child.attrib['dim'], bindings, expect_value=True)
         x = onnx.helper.make_tensor_value_info(name,
                                             ONNX_TYPE_DICT[child_type],
                                             dim)
@@ -204,19 +212,19 @@ def export(
         # Go through each node in the block
         for node in block.findall('node'):
             try:
-                op = node.attrib['op']
+                op = _resolve_attr(node.attrib['op'], bindings, expect_value=False)
             except KeyError:
                 raise SyntaxError("Op type not specified for some node")
-            title = node.attrib['title']
+            title = _resolve_attr(node.attrib['title'], bindings, expect_value=False)
             title = get_unique_node_name(title)
             
             # Get inputs and outputs
             input_els = node.findall("input")
-            naive_inputs = [el.attrib['src'] for el in input_els]
+            naive_inputs = [_resolve_attr(el.attrib['src'], bindings, expect_value=False) for el in input_els]
             inputs = [name_resolves[x] if x in name_resolves else x for x in naive_inputs]
 
             output_els = node.findall("output")
-            naive_outputs = [el.attrib['name'] for el in output_els]
+            naive_outputs = [_resolve_attr(el.attrib['name'], bindings, expect_value=False) for el in output_els]
             outputs = [name_resolves[x] if x in name_resolves else x for x in naive_outputs]
 
             # Make the parameters
@@ -225,15 +233,15 @@ def export(
             for param in param_els:
                 # Note: order can be important!
                 # Each op type specifies the order in which inputs are meant to be included
-                orig_name = param.attrib['name']
+                orig_name = _resolve_attr(param.attrib['name'], bindings, expect_value=False)
                 name = orig_name
                 try:
-                    shared = param.attrib['shared']
+                    shared = _resolve_attr(param.attrib['shared'], bindings, expect_value=False)
                 except:
                     shared = "no"
                 
-                dim = param.attrib['dim']
-                dtype = param.attrib['type']
+                dim = _resolve_attr(param.attrib['dim'], bindings, expect_value=True)
+                dtype = _resolve_attr(param.attrib['type'], bindings, expect_value=False)
 
                 if shared == "no":
                     name = get_unique_param_name(orig_name)
@@ -257,21 +265,25 @@ def export(
             elif op == "Relu":
                 pass
             elif op == "LpNormalization":
-                kwargs["axis"] = int(node.attrib['axis'])
-                kwargs["p"] = int(node.attrib['p'])
+                kwargs["axis"] = _resolve_attr(node.attrib['axis'], bindings, expect_value=True)
+                kwargs["p"] = _resolve_attr(node.attrib['p'], bindings, expect_value=True)
                 inputs = params + inputs  # you can transpose params
                 if len(inputs) > 1:
                     raise SyntaxWarning(f"LpNormalization should only have one input, yet it has {len(inputs)}")
             elif op == "Transpose":
                 try:
                     perm = node.attrib['perm']
-                    kwargs["perm"] = json.loads(perm)
+                    kwargs["perm"] = _resolve_attr(perm, bindings, expect_value=True)
                 except KeyError:
                     pass  # Default perm value, which is reverse
                 inputs = params + inputs  # you can transpose params
                 if len(inputs) > 1:
                     raise SyntaxWarning(f"Transpose should only have one input, yet it has {len(inputs)}")
-
+            elif op == "Identity":
+                inputs = params + inputs
+                if len(inputs) > 1:
+                    raise SyntaxWarning(f"Identity should only have one input, yet it has {len(inputs)}")
+            
             new_node = onnx.helper.make_node(
                 name=title,
                 op_type=op,
@@ -306,8 +318,8 @@ def export(
             curr_exports = []
             # Find the current exports so that we can import them next time
             for exp in block.findall('export'):
-                if exp.attrib['from'] in name_resolves:
-                    curr_exports.append(name_resolves[exp.attrib['from']])
+                if _resolve_attr(exp.attrib['from'], bindings, expect_value=False) in name_resolves:
+                    curr_exports.append(name_resolves[_resolve_attr(exp.attrib['from'], bindings, expect_value=False)])
                 else:
                     curr_exports.append(exp.attrib['from'])
 
@@ -316,7 +328,7 @@ def export(
             # Note that iter gets nested children as well
             for node in block.iter('node'):
                 for out_el in node.findall("output"):
-                    name = out_el.attrib['name']
+                    name = _resolve_attr(out_el.attrib['name'], bindings, expect_value=False)
                     uni = get_unique_name(name)
                     name_resolves[name] = uni  # for next rep
             
@@ -324,7 +336,7 @@ def export(
             # change the import resolves
             for i, imp in enumerate(block.findall('import')):
                 try:
-                    name_resolves[imp.attrib['from']] = curr_exports[i]
+                    name_resolves[_resolve_attr(imp.attrib['from'], bindings, expect_value=False)] = curr_exports[i]
                 except IndexError:  # it's ok if some imports come from somewhere else and aren't repeated (they must be the last ones)
                     break
 

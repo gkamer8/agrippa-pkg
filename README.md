@@ -90,8 +90,9 @@ The currently supported op types are:
 | ONNX OpType | ONNX Compile Support               | PyTorch Training Support |
 | ----------- | ---------------------------------- |--------------------------|
 | Add         | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
-| MatMul      | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
+| Identity    | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
 | LpNormalization | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
+| MatMul      | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
 | Relu        | <span style=color:green>Yes</span> |<span style=color:green>Yes</span>|
 | Transpose   | <span style=color:green>Yes</span> |<span style=color:green>Yes</span>|
 
