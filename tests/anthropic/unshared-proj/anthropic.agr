@@ -1,0 +1,47 @@
+<model script-version="0.0.1">
+
+    <import dim="[var(features), 1]" from="input" type="float32" />
+
+    <block title="Down Projection">
+        <import from="input" />
+        <node title="Linear" op="MatMul">
+            <params dim="[2, var(features)]" name="W" type="float32" shared="yes" />
+            <input dim="[var(features), 1]" src="input" />
+            <output dim="[2, 1]" name="down" />
+        </node>
+        <export from="down" />
+    </block>
+
+    <block title="Up Projection">
+        <import from="down" />
+        <node title="Linear" op="MatMul">
+            <params dim="[var(features), 2]" name="W2" type="float32" shared="yes" />
+            <input dim="[2, 1]" src="down" />
+            <output dim="[var(features), 1]" name="linear2" />
+        </node>
+        <export from="linear2" />
+    </block>
+
+    <block title="Add">
+        <import from="linear2" />
+        <node title="Bias" op="Add">
+            <params dim="[var(features), 1]" name="b" type="float32" />
+            <input dim="[var(features), 1]" src="linear2" />
+            <output dim="[var(features), 1]" name="biased" />
+        </node>
+        <export from="biased" />
+    </block>
+
+    <block title="Activation">
+        <import from="biased" />
+        <node title="ReLu" op="Relu">
+            <input dim="[var(features), 1]" src="biased" />
+            <output dim="[var(features), 1]" name="y" />
+        </node>
+        <export from="y" />
+    </block>
+
+    <export dim="[var(features), 1]" from="y" type="float32" />
+    <export dim="[2, 1]" from="down" type="float32" />
+
+</model>

@@ -14,8 +14,8 @@ import json
 
 # Recreate the anthropic thing sort of
 
-proj_name = 'anthropic-proj'
-onnx_out = 'anthropic.onnx'
+proj_name = 'unshared-proj'
+onnx_out = 'anthropic_exten.onnx'
 features = 5
 bindings = {'features': str(features)}
 
@@ -34,6 +34,10 @@ def generate_input(features, feature_probability, nbatch=1024):
 
 losses = []
 
+lr_schedule = {
+    0: 1e-3,
+}
+
 def optimize(model,
              importance,
              steps=10_000,
@@ -45,6 +49,9 @@ def optimize(model,
     opt = torch.optim.AdamW(list(model.parameters()), lr=lr)
 
     for step in range(steps):
+        if step in lr_schedule:
+            opt = torch.optim.AdamW(list(model.parameters()), lr=lr_schedule[step])
+        
         opt.zero_grad()
 
         batch = generate_input(features, sparsity)
@@ -83,11 +90,14 @@ else:  # small
 print("W:")
 print(final_params['initializers.W'])
 
-print("(WT)(W):")
-print(torch.matmul(torch.transpose(final_params['initializers.W'], 0, 1), final_params['initializers.W']))
+print("W2:")
+print(final_params['initializers.W2'])
 
 print("b:")
 print(final_params['initializers.b'])
+
+print("(W2)W")
+print(torch.matmul(final_params['initializers.W2'], final_params['initializers.W']))
 
 print("Test x:")
 
@@ -111,6 +121,20 @@ pairs = []
 for i in range(features):
     x = final_params['initializers.W'][0, i]
     y = final_params['initializers.W'][1, i]
+    pairs.append((x, y))
+
+for x, y in pairs:
+    plt.plot([0, x], [0, y])
+
+plt.xlim(-1, 1)
+plt.ylim(-1, 1)
+
+plt.show()
+
+pairs = []
+for i in range(features):
+    x = final_params['initializers.W2'][i, 0]
+    y = final_params['initializers.W2'][i, 1]
     pairs.append((x, y))
 
 for x, y in pairs:
