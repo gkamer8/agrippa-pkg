@@ -120,14 +120,18 @@ The only currently supported type is `float32`.
 The currently supported op types are:
 
 
-| ONNX OpType | ONNX Compile Support               | PyTorch Training Support |
+| ONNX OpType | Tested ONNX Compile Support        | Tested Training Support |
 | ----------- | ---------------------------------- |--------------------------|
 | Add         | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
 | Identity    | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
 | LpNormalization | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
 | MatMul      | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
+| Mul         | <span style=color:green>Yes</span> |<span style=color:red>No</span>|
 | Relu        | <span style=color:green>Yes</span> |<span style=color:green>Yes</span>|
+| ReduceMean  | <span style=color:green>Yes</span> |<span style=color:red>No</span>|
 | Softmax     | <span style=color:green>Yes</span> |<span style=color:red>No</span>|
+| Sqrt        | <span style=color:green>Yes</span> |<span style=color:red>No</span>|
+| Sub         | <span style=color:green>Yes</span> |<span style=color:red>No</span>|
 | Transpose   | <span style=color:green>Yes</span> |<span style=color:green>Yes</span>|
 
 ## Syntax Highlighting in VSCode

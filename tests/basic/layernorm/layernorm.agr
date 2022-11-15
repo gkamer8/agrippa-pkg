@@ -1,0 +1,44 @@
+<model>
+    <import from="input" dim="[10, 5]" />
+    <block title="LayerNorm">
+        <import from="input" />
+        <node op="ReduceMean" axes="[-1]">
+            <input src="input" />
+            <output name="means" />
+        </node>
+        <node op="Sub">
+            <input src="input" />
+            <input src="means" />
+            <output name="centered" />
+        </node>
+        <node op="Mul">
+            <input src="centered" />
+            <input src="centered" />
+            <output name="squared" />
+        </node>
+        <node op="ReduceMean" axes="[-1]">
+            <input src="squared" />
+            <output name="sigma_squared" />
+        </node>
+        <node op="Sqrt">
+            <input src="sigma_squared" />
+            <output name="sigma" />
+        </node>
+        <node op="Div">
+            <params name="gain" dim="[1, 5]" />
+            <input src="sigma" />
+            <output name="gains" />
+        </node>
+        <node op="Mul">
+            <input src="centered" />
+            <input src="gains" />
+            <output name="gained" />
+        </node>
+        <node op="Add">
+            <input src="gained" />
+            <params dim="[1, 5]" name="biases" />
+            <output name="layer_norm_out" />
+        </node>
+    </block>
+    <export from="layer_norm_out" dim="[10, 5]" />
+</model>

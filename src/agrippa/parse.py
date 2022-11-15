@@ -28,6 +28,9 @@ def _resolve_attr(text, bindings, expect_value=True):
     if bindings:
         for key in bindings:
             text = text.replace("var("+str(key)+")", str(bindings[key]))
+    # detect unbound variable
+    if text.find("var(") != -1:
+        raise SyntaxWarning(f"Unbound variable found in attribute '{text}'")
     if expect_value:
         return json.loads(text)
     return text
@@ -47,7 +50,8 @@ def _resolve_param(name, data_type, dims, weights):
 
     _notify(f"Weight {name} not found; arbitrarily initializing")
 
-    tens = np.random.random(dims)
+    # Uniformly random between [-1, 1)
+    tens = np.random.random(dims) * 2 - 1
 
     res = onnx.helper.make_tensor(
             name=name,
@@ -245,8 +249,19 @@ def export(
 
             # Make the parameters
             params = []
-            param_els = node.findall("params")
-            for param in param_els:
+            param_precedence = []
+            all_children = node.findall("*")
+            precendence_counter = 0
+            for el in all_children:
+                if el.tag == "params":
+                    param = el
+                    param_precedence.append(precendence_counter)
+                    precendence_counter += 1
+                elif el.tag == "input":
+                    precendence_counter += 1
+                    continue
+                else:
+                    continue
                 # Note: order can be important!
                 # Each op type specifies the order in which inputs are meant to be included
                 orig_name = _resolve_attr(param.attrib['name'], bindings, expect_value=False)
@@ -277,18 +292,31 @@ def export(
                 params.append(name)
 
             kwargs = {}
+
+            def splice_inputs(inputs, params, param_precedence):
+                to_return = [None for _ in range(len(inputs) + len(params))]
+                input_index = 0
+                param_index = 0
+                for i in range(len(to_return)):
+                    if param_index < len(params) and param_precedence[param_index] == i:
+                        to_return[i] = params[param_index]
+                        param_index += 1
+                    elif input_index < len(inputs):
+                        to_return[i] = inputs[input_index]
+                        input_index += 1
+                return to_return
             # Sometimes there are other tags defining certain attributes
             # Here is where we would need to support new op types
             if op == 'MatMul':
-                inputs = params + inputs
+                inputs = splice_inputs(inputs, params, param_precedence)
             elif op == "Add":
-                inputs = params + inputs
+                inputs = splice_inputs(inputs, params, param_precedence)
             elif op == "Relu":
-                pass
+                inputs = splice_inputs(inputs, params, param_precedence)
             elif op == "LpNormalization":
                 kwargs["axis"] = _resolve_attr(node.attrib['axis'], bindings, expect_value=True)
                 kwargs["p"] = _resolve_attr(node.attrib['p'], bindings, expect_value=True)
-                inputs = params + inputs  # you can transpose params
+                inputs = splice_inputs(inputs, params, param_precedence)
                 if len(inputs) > 1:
                     raise SyntaxWarning(f"LpNormalization should only have one input, yet it has {len(inputs)}")
             elif op == "Transpose":
@@ -297,26 +325,43 @@ def export(
                     kwargs["perm"] = _resolve_attr(perm, bindings, expect_value=True)
                 except KeyError:
                     pass  # Default perm value, which is reverse
-                inputs = params + inputs  # you can transpose params
+                inputs = splice_inputs(inputs, params, param_precedence)
                 if len(inputs) > 1:
                     raise SyntaxWarning(f"Transpose should only have one input, yet it has {len(inputs)}")
             elif op == "Identity":
-                inputs = params + inputs
+                inputs = splice_inputs(inputs, params, param_precedence)
                 if len(inputs) > 1:
                     raise SyntaxWarning(f"Identity should only have one input, yet it has {len(inputs)}")
             elif op =="Softmax":
                 kwargs["axis"] = _resolve_attr(node.attrib['axis'], bindings, expect_value=True)
-                inputs = params + inputs
+                inputs = splice_inputs(inputs, params, param_precedence)
                 if len(inputs) > 1:
                     raise SyntaxWarning(f"Softmax should only have one input, yet it has {len(inputs)}")
             elif op == "Div":
-                inputs = params + inputs
+                inputs = splice_inputs(inputs, params, param_precedence)
                 if len(inputs) != 2:
                     raise SyntaxWarning(f"Div should only have exactly 2 inputs, yet it has {len(inputs)}")
             elif op == "Mul":
-                inputs = params + inputs
+                inputs = splice_inputs(inputs, params, param_precedence)
                 if len(inputs) != 2:
-                    raise SyntaxWarning(f"Mul should only have exactly 2 inputs, yet it has {len(inputs)}")
+                    raise SyntaxWarning(f"Mul should have exactly 2 inputs, yet it has {len(inputs)}")
+            elif op == "ReduceMean":
+                kwargs["axes"] = _resolve_attr(node.attrib['axes'], bindings, expect_value=True)
+                try:
+                    kwargs["keepdims"] = _resolve_attr(node.attrib['keepdims'], bindings, expect_value=True)
+                except KeyError:
+                    _notify("No keepdims attr selected for ReduceMean; default=1.")
+                inputs = splice_inputs(inputs, params, param_precedence)
+                if len(inputs) > 1:
+                    raise SyntaxWarning(f"Softmax should only have one input, yet it has {len(inputs)}")
+            elif op == "Sub":
+                inputs = splice_inputs(inputs, params, param_precedence)
+                if len(inputs) != 2:
+                    raise SyntaxWarning(f"Sub should have exactly 2 inputs, yet it has {len(inputs)}")
+            elif op == "Sqrt":
+                inputs = splice_inputs(inputs, params, param_precedence)
+                if len(inputs) != 1:
+                    raise SyntaxWarning(f"Sqrt should only have 1 input, yet it has {len(inputs)}")
 
             new_node = onnx.helper.make_node(
                 name=title,
