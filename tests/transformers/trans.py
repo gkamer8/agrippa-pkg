@@ -20,6 +20,9 @@ bindings = {
 # Convert xml to onnx
 agrippa.export(proj_folder, onnx_fname, bindings=bindings)
 
+mask = np.ones((bindings['ntokens'], bindings['ntokens'])).astype('float32')
+scale = np.array([bindings['dmodel']]).astype('float32')
+
 # Random sequence of tokens in one hot vector matrix (column vectors)
 rand_probs = np.random.random((bindings['nvocab'], bindings['ntokens']))
 maxes = np.argmax(rand_probs, axis=0)
@@ -28,6 +31,6 @@ tokens[maxes, np.arange(bindings['ntokens'])] = 1.
 tokens = tokens.astype("float32")
 
 ort_sess = ort.InferenceSession(onnx_fname, providers=['CPUExecutionProvider'])
-outputs = ort_sess.run(None, {'tokens': tokens})
+outputs = ort_sess.run(None, {'tokens': tokens, 'mask': mask, 'scale': scale})
 
 print(outputs)

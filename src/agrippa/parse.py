@@ -309,6 +309,14 @@ def export(
                 inputs = params + inputs
                 if len(inputs) > 1:
                     raise SyntaxWarning(f"Softmax should only have one input, yet it has {len(inputs)}")
+            elif op == "Div":
+                inputs = params + inputs
+                if len(inputs) != 2:
+                    raise SyntaxWarning(f"Div should only have exactly 2 inputs, yet it has {len(inputs)}")
+            elif op == "Mul":
+                inputs = params + inputs
+                if len(inputs) != 2:
+                    raise SyntaxWarning(f"Mul should only have exactly 2 inputs, yet it has {len(inputs)}")
 
             new_node = onnx.helper.make_node(
                 name=title,
@@ -325,7 +333,7 @@ def export(
         
         # Does the block have a rep?
         try:
-            rep = int(block.attrib['rep'])
+            rep = _resolve_attr(block.attrib['rep'], bindings)
         except KeyError:
             rep = 1
 
