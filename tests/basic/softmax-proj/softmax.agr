@@ -1,0 +1,14 @@
+<model>
+
+    <import from="input" dim="[10, 2]" />
+    <block title="Softmax">
+        <import from="input" />
+        <node title="SoftmaxNode" op="Softmax" axis="0">
+            <input src="input" />
+            <output name="y" />
+        </node>
+        <export from="y" />
+    </block>
+    <export from="y" dim="[10, 2]" />
+
+</model>

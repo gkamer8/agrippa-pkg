@@ -13,6 +13,8 @@ ONNX_TYPE_DICT = {
     "float32": onnx.TensorProto.FLOAT
 }
 
+DEFAULT_TYPE = "float32"
+
 suppress_prints = False
 
 # For print statements
@@ -25,11 +27,10 @@ def _notify(str):
 def _resolve_attr(text, bindings, expect_value=True):
     if bindings:
         for key in bindings:
-            text = text.replace("var("+key+")", bindings[key])
+            text = text.replace("var("+str(key)+")", str(bindings[key]))
     if expect_value:
         return json.loads(text)
     return text
-
 
 def _resolve_param(name, data_type, dims, weights):
     if name in weights:
@@ -151,8 +152,13 @@ def export(
 
     # Root model imports
     for child in root.findall("import"):
+
+        child_type = DEFAULT_TYPE
+        if 'type' in child.attrib:
+            child_type = child.attrib['type']
+
         name = _resolve_attr(child.attrib['from'], bindings, expect_value=False)
-        child_type = _resolve_attr(child.attrib['type'], bindings, expect_value=False)
+        child_type = _resolve_attr(child_type, bindings, expect_value=False)
         dim = _resolve_attr(child.attrib['dim'], bindings, expect_value=True)
         x = onnx.helper.make_tensor_value_info(name,
                                             ONNX_TYPE_DICT[child_type],
@@ -161,8 +167,13 @@ def export(
 
     # Root model exports
     for child in root.findall("export"):
+
+        child_type = DEFAULT_TYPE
+        if 'type' in child.attrib:
+            child_type = child.attrib['type']
+
         name = _resolve_attr(child.attrib['from'], bindings, expect_value=False)
-        child_type = _resolve_attr(child.attrib['type'], bindings, expect_value=False)
+        child_type = _resolve_attr(child_type, bindings, expect_value=False)
         dim = _resolve_attr(child.attrib['dim'], bindings, expect_value=True)
         x = onnx.helper.make_tensor_value_info(name,
                                             ONNX_TYPE_DICT[child_type],
@@ -215,7 +226,12 @@ def export(
                 op = _resolve_attr(node.attrib['op'], bindings, expect_value=False)
             except KeyError:
                 raise SyntaxError("Op type not specified for some node")
-            title = _resolve_attr(node.attrib['title'], bindings, expect_value=False)
+
+            try:
+                title = node.attrib['title']
+                title = _resolve_attr(node.attrib['title'], bindings, expect_value=False)
+            except KeyError:
+                title = "GenericNode"  # node title is optional
             title = get_unique_node_name(title)
             
             # Get inputs and outputs
@@ -241,7 +257,12 @@ def export(
                     shared = "no"
                 
                 dim = _resolve_attr(param.attrib['dim'], bindings, expect_value=True)
-                dtype = _resolve_attr(param.attrib['type'], bindings, expect_value=False)
+                
+                param_type = DEFAULT_TYPE
+                if 'type' in param.attrib:
+                    param_type = param.attrib['type']
+
+                dtype = _resolve_attr(param_type, bindings, expect_value=False)
 
                 if shared == "no":
                     name = get_unique_param_name(orig_name)
@@ -283,7 +304,12 @@ def export(
                 inputs = params + inputs
                 if len(inputs) > 1:
                     raise SyntaxWarning(f"Identity should only have one input, yet it has {len(inputs)}")
-            
+            elif op =="Softmax":
+                kwargs["axis"] = _resolve_attr(node.attrib['axis'], bindings, expect_value=True)
+                inputs = params + inputs
+                if len(inputs) > 1:
+                    raise SyntaxWarning(f"Softmax should only have one input, yet it has {len(inputs)}")
+
             new_node = onnx.helper.make_node(
                 name=title,
                 op_type=op,

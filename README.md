@@ -92,11 +92,22 @@ Blocks may take a `rep` attribute, which defines how many times a block should b
 
 ## Variable Bindings
 
-The `agrippa.export` function takes an optional argument, `bindings`. The `bindings` parameter is meant to be a dictionary of variables, set by the user, to replace areas in the markup file where the `var` function is used. For example, if an input tag has a `dim` attribute set to `"[var(image_width), var(image_height)]"`, a binding of `{'image_width': '512', 'image_height': '256'}` would set all occurances of `var(image_height)` to `512` and all occurances of `var(image_height)` to `256`. Note that in all cases, strings are used, since xml attributes require strings.
+The `agrippa.export` function takes an optional argument, `bindings`. The `bindings` parameter is meant to be a dictionary of variables, set by the user, to replace areas in the markup file where the `var` function is used. For example, if an input tag has a `dim` attribute set to `"[var(image_width), var(image_height)]"`, a binding of `{'image_width': 512, 'image_height': '256'}` would set all occurances of `var(image_height)` to `512` and all occurances of `var(image_height)` to `256`. Note that in all cases, strings are used, since xml attributes require strings; the values are type-casted upon compilation.
 
 ## Other Rules
 
-Each node in your file must have a unique title (name in ONNX). If it is inside a repeated block, the title will be mangled when it is converted to ONNX. Similarly, repeated output names will also be mangled. Parameter names should be unique only when they are not shared parameters; parameters inside repeated blocks will have their names mangled so that they are unique. Name mangling affects parameters, node titles, and output/input names separately.
+### Names
+
+Node titles are optional (a default, unique game is given to them upon compilation). Parameter names should be unique only when they are not shared parameters; parameters inside repeated blocks will have their names mangled so that they are unique. Name mangling affects parameters, node titles, and output/input names separately.
+
+### Types
+
+Types by default are set to float32.
+
+### Dimensions
+
+Specifying the dimensions of inputs and outputs are optional. Specifying the dimensions of imports and exports are only required at the root level, though it is recommended that you specify them for clarity.
+
 
 Any behavior not mentioned here is undefined.
 
@@ -116,6 +127,7 @@ The currently supported op types are:
 | LpNormalization | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
 | MatMul      | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
 | Relu        | <span style=color:green>Yes</span> |<span style=color:green>Yes</span>|
+| Softmax     | <span style=color:green>Yes</span> |<span style=color:red>No</span>|
 | Transpose   | <span style=color:green>Yes</span> |<span style=color:green>Yes</span>|
 
 ## Syntax Highlighting in VSCode
