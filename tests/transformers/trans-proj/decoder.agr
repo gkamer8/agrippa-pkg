@@ -1,0 +1,65 @@
+<model script-version="0.0.1">
+
+    <!-- Uses default type, which is float32 -->
+
+    <import from="tokens" dim="[var(nvocab), var(ntokens)]" />
+
+    <!-- Shrinks tokens into dmodel using a learned embedding -->
+    <block title="Embedding">
+        <import from="tokens" dim="[var(nvocab), var(ntokens)]" />
+        <node op="MatMul">
+            <params name="Embed" dim="[var(dmodel), var(nvocab)]" />
+            <input src="tokens" dim="[var(nvocab), var(ntokens)]" />
+            <output name="embeddings" />
+        </node>
+        <export from="embeddings" dim="[var(dmodel), var(ntokens)]" />
+    </block>
+
+    <!-- Not implemented - just an identity op -->
+    <block title="PositionalEmbedding">
+        <import from="embeddings" dim="[var(dmodel), var(ntokens)]" />
+        <node op="Identity">
+            <input src="embeddings" dim="[var(dmodel), var(ntokens)]" />
+            <output name="posembeddings" />
+        </node>
+        <export from="posembeddings" dim="[var(dmodel), var(ntokens)]" />
+    </block>
+
+    <!-- The big decoder block -->
+    <!-- NOT IMPLEMENTED YET -->
+    <!-- <block title="Decoder">
+        <import from="posembeddings" dim="[[var(dmodel), var(ntokens)]" />
+       
+        <block title="DecoderLayer" rep="var(nlayers)">
+
+        </block>
+
+        <export from="layer_out" />
+    </block> -->
+
+    <!-- Linear to get to vocab size, no softmax - basically reverse of embedding -->
+    <!-- Weights could be shared with embedding, but are not here -->
+    <block title="Linear">
+        <import from="posembeddings" />
+         <node op="MatMul">
+            <params name="RevEmbed" dim="[var(nvocab), var(dmodel)]" />
+            <input src="posembeddings" dim="[var(dmodel), var(ntokens)]" />
+            <output name="linear" dim="[var(nvocab), var(ntokens)]" />
+        </node>
+        <export from="linear" />
+    </block>
+
+    <!-- Final softmax to get probabilities -->
+    <block title="Softmax">
+        <import from="linear" />
+        <!-- Note: softmax is along rows, i.e. columns will sum to 1 -->
+        <node op="Softmax" axis="0">
+            <input src="linear" dim="[var(nvocab), var(ntokens)]" />
+            <output name="softmax" dim="[var(nvocab), var(ntokens)]" />
+        </node>
+        <export from="softmax" />
+    </block>
+
+    <export from="softmax" dim="[var(nvocab), var(ntokens)]" />
+
+</model>
