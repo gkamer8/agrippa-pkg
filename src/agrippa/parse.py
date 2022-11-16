@@ -139,7 +139,7 @@ def export(
     if not weights_file:
         _notify("No weights file found - using arbitrary initialization.")
     elif reinit:
-        print("Re-initializing weights, as per your request.")
+        _notify("Re-initializing weights, as per your request.")
     else:
         with open(os.path.join(infile, weights_file), "rb") as fhand:
             weights = pickle.load(fhand)
@@ -169,28 +169,13 @@ def export(
                                             dim)
         all_inputs.append(x)
 
-    # Root model exports
-    for child in root.findall("export"):
-
-        child_type = DEFAULT_TYPE
-        if 'type' in child.attrib:
-            child_type = child.attrib['type']
-
-        name = _resolve_attr(child.attrib['from'], bindings, expect_value=False)
-        child_type = _resolve_attr(child_type, bindings, expect_value=False)
-        dim = _resolve_attr(child.attrib['dim'], bindings, expect_value=True)
-        x = onnx.helper.make_tensor_value_info(name,
-                                            ONNX_TYPE_DICT[child_type],
-                                            dim)
-        all_outputs.append(x)
-
     parameter_repeats = {}  # for shared params, decide whether to create new weight value for a parameter
     def get_unique_param_name(name):
         if name in parameter_repeats:
             parameter_repeats[name] += 1
-            return name + str(parameter_repeats[name])
+            return name + "$" + str(parameter_repeats[name])
         parameter_repeats[name] = 1
-        return name
+        return name + "$1"
 
     # used to make sure we get a unique weight name + we can handle nested repeats
     # must return a different name from name even if it doesn't exist yet in the repeats dictionary
@@ -198,17 +183,17 @@ def export(
     def get_unique_name(name):
         if name in repeats:
             repeats[name] += 1
-            return name + str(repeats[name])
+            return name + "$" + str(repeats[name])
         repeats[name] = 1
-        return name
+        return name + "$1"
 
     repeat_node_names = {}
     def get_unique_node_name(name):
         if name in repeat_node_names:
             repeat_node_names[name] += 1
-            return name + str(repeat_node_names[name])
+            return name + "$" + str(repeat_node_names[name])
         repeat_node_names[name] = 1
-        return name
+        return name + "$1"
 
     block_id_tracker = {'curr': 0}  # A hack to not technically use a global var
     def make_unique_block_id():
@@ -429,6 +414,27 @@ def export(
     # Go through each block (does this recursively)
     for block in root.findall('block'):
         parse_block(block, make_unique_block_id())
+
+    # Root model exports - their names might have changed!
+    for child in root.findall("export"):
+
+        child_type = DEFAULT_TYPE
+        if 'type' in child.attrib:
+            child_type = child.attrib['type']
+
+        naive_name = _resolve_attr(child.attrib['from'], bindings, expect_value=False)
+
+        if naive_name in name_resolves:
+            name = name_resolves[naive_name]
+        else:
+            name = naive_name
+
+        child_type = _resolve_attr(child_type, bindings, expect_value=False)
+        dim = _resolve_attr(child.attrib['dim'], bindings, expect_value=True)
+        x = onnx.helper.make_tensor_value_info(name,
+                                            ONNX_TYPE_DICT[child_type],
+                                            dim)
+        all_outputs.append(x)
 
     # Create the graph (GraphProto)
     graph_def = onnx.helper.make_graph(

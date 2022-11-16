@@ -30,8 +30,8 @@
 
     <!-- The big decoder block -->
     <!-- NOT IMPLEMENTED YET -->
-    <block title="DecoderLayer">
-        <import from="posembeddings" dim="[[var(ntokens), var(dmodel)]" />
+    <block title="DecoderLayer" rep="2">
+        <import from="posembeddings" dim="[var(ntokens), var(dmodel)]" />
         <import from="scale" dim="[var(ntokens), var(ntokens)]" />
         <import from="mask" dim="[var(ntokens), var(ntokens)]" />
        
@@ -98,12 +98,63 @@
             <export from="attended" />
         </block>
         
-        <!-- TODO: ADD AND NORM -->
-        
-        <block title="FFN">
+        <block title="Add">
             <import from="attended" />
-            <node op="MatMul">
+            <import from="posembeddings" />
+            <node op="Add">
                 <input src="attended" />
+                <input src="posembeddings" />
+                <output name="attended_added" />
+            </node>
+            <export from="attended_added" />
+        </block>
+
+        <block title="LayerNorm">
+            <import from="attended_added" />
+            <node op="ReduceMean" axes="[-1]">
+                <input src="attended_added" />
+                <output name="means" />
+            </node>
+            <node op="Sub">
+                <input src="attended_added" />
+                <input src="means" />
+                <output name="centered" />
+            </node>
+            <node op="Mul">
+                <input src="centered" />
+                <input src="centered" />
+                <output name="squared" />
+            </node>
+            <node op="ReduceMean" axes="[-1]">
+                <input src="squared" />
+                <output name="sigma_squared" />
+            </node>
+            <node op="Sqrt">
+                <input src="sigma_squared" />
+                <output name="sigma" />
+            </node>
+            <node op="Div">
+                <params name="gain" dim="[1, var(dmodel)]" />
+                <input src="sigma" />
+                <output name="gains" />
+            </node>
+            <node op="Mul">
+                <input src="centered" />
+                <input src="gains" />
+                <output name="gained" />
+            </node>
+            <node op="Add">
+                <input src="gained" />
+                <params dim="[1, var(dmodel)]" name="biases" />
+                <output name="layer_norm_out" />
+            </node>
+            <export from="layer_norm_out" />
+        </block>
+
+        <block title="FFN">
+            <import from="layer_norm_out" />
+            <node op="MatMul">
+                <input src="layer_norm_out" />
                 <params name="ffn_w" dim="[var(dmodel), var(dffnhidden)]" />
                 <output name="ffn_projected" dim="[var(ntokens), var(dffnhidden)]" />
             </node>
@@ -130,7 +181,61 @@
             </node>
             <export from="ffn_out" />
         </block>
-        <export from="ffn_out" />
+
+        <block title="Add2">
+            <import from="ffn_out" />
+            <import from="layer_norm_out" />
+            <node op="Add">
+                <input src="ffn_out" />
+                <input src="layer_norm_out" />
+                <output name="attended_added2" />
+            </node>
+            <export from="attended_added2" />
+        </block>
+
+        <block title="LayerNorm2">
+            <import from="attended_added2" />
+            <node op="ReduceMean" axes="[-1]">
+                <input src="attended_added2" />
+                <output name="means2" />
+            </node>
+            <node op="Sub">
+                <input src="attended_added2" />
+                <input src="means2" />
+                <output name="centered2" />
+            </node>
+            <node op="Mul">
+                <input src="centered2" />
+                <input src="centered2" />
+                <output name="squared2" />
+            </node>
+            <node op="ReduceMean" axes="[-1]">
+                <input src="squared2" />
+                <output name="sigma_squared2" />
+            </node>
+            <node op="Sqrt">
+                <input src="sigma_squared2" />
+                <output name="sigma2" />
+            </node>
+            <node op="Div">
+                <params name="gain2" dim="[1, var(dmodel)]" />
+                <input src="sigma2" />
+                <output name="gains2" />
+            </node>
+            <node op="Mul">
+                <input src="centered2" />
+                <input src="gains2" />
+                <output name="gained2" />
+            </node>
+            <node op="Add">
+                <input src="gained2" />
+                <params dim="[1, var(dmodel)]" name="biases2" />
+                <output name="layer_norm_out2" />
+            </node>
+            <export from="layer_norm_out2" />
+        </block>
+
+        <export from="layer_norm_out2" />
     </block>
 
     <!-- Linear to get to vocab size, no softmax - basically reverse of embedding -->
@@ -157,6 +262,6 @@
     <export from="softmax" dim="[var(nvocab), var(ntokens)]" />
         -->
 
-    <export from="ffn_out" dim="[var(ntokens), var(dmodel)]" />
+    <export from="layer_norm_out2" dim="[var(ntokens), var(dmodel)]" />
 
 </model>

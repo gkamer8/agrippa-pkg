@@ -21,7 +21,7 @@ bindings = {
 }
 
 # Convert xml to onnx
-agrippa.export(proj_folder, onnx_fname, bindings=bindings, reinit=True)
+agrippa.export(proj_folder, onnx_fname, bindings=bindings, reinit=True, suppress=True)
 
 print("Exported")
 

@@ -20,3 +20,5 @@ And we have a new picture to look at, which is the rows of the second weight mat
 
 <img src="figures/weight_rows_unshared.png" width="400"/>
 
+Note that when multiplied together, the effect is the same as taking $W^TW$ in the original setup
+
