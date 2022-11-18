@@ -35,7 +35,7 @@ def _resolve_attr(text, bindings, expect_value=True):
         return json.loads(text)
     return text
 
-def _resolve_param(name, data_type, dims, weights):
+def _resolve_param(name, data_type, dims, weights, init_type="normal"):
     if name in weights:
         try:
             tens = weights[name]
@@ -51,8 +51,18 @@ def _resolve_param(name, data_type, dims, weights):
     _notify(f"Weight {name} not found; arbitrarily initializing")
 
     # Uniformly random between [-1, 1)
-    tens = np.random.random(dims) * 2 - 1
 
+    if init_type == 'normal':
+        tens = np.random.normal(loc=0, scale=1, size=dims)
+    elif init_type == 'uni_random':
+        tens = np.random.random(dims) * 2 - 1
+    elif init_type == 'ones':
+        tens = np.ones(dims)
+    elif init_type == 'zeros':
+        tens = np.zeros(dims)
+    else:
+        _notify(f"Weight initialization type '{init_type}' not known; defaulting to N(0, 1)")
+        tens = np.random.normal(loc=0., scale=1., size=dims)
     res = onnx.helper.make_tensor(
             name=name,
             data_type=data_type,
@@ -264,14 +274,19 @@ def export(
 
                 dtype = _resolve_attr(param_type, bindings, expect_value=False)
 
+                try:
+                    init_type = _resolve_attr(param.attrib['init'], bindings, expect_value=False)
+                except:
+                    init_type = "normal"
+
                 if shared == "no":
                     name = get_unique_param_name(orig_name)
-                    param_onnx = _resolve_param(name, ONNX_TYPE_DICT[dtype], dim, weights)
+                    param_onnx = _resolve_param(name, ONNX_TYPE_DICT[dtype], dim, weights, init_type=init_type)
                     all_inits.append(param_onnx)
                 else:
                     # First time we see it, even if we keep the name, need to initialize
                     if name not in parameter_repeats:
-                        param_onnx = _resolve_param(name, ONNX_TYPE_DICT[dtype], dim, weights)
+                        param_onnx = _resolve_param(name, ONNX_TYPE_DICT[dtype], dim, weights, init_type=init_type)
                         all_inits.append(param_onnx)
                         parameter_repeats[name] = 1  # so we don't do this next time
                 params.append(name)

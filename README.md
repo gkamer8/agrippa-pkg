@@ -126,12 +126,12 @@ The currently supported op types are:
 | Identity    | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
 | LpNormalization | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
 | MatMul      | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
-| Mul         | <span style=color:green>Yes</span> |<span style=color:red>No</span>|
+| Mul         | <span style=color:green>Yes</span> |<span style=color:green>Yes</span>|
 | Relu        | <span style=color:green>Yes</span> |<span style=color:green>Yes</span>|
-| ReduceMean  | <span style=color:green>Yes</span> |<span style=color:red>No</span>|
-| Softmax     | <span style=color:green>Yes</span> |<span style=color:red>No</span>|
-| Sqrt        | <span style=color:green>Yes</span> |<span style=color:red>No</span>|
-| Sub         | <span style=color:green>Yes</span> |<span style=color:red>No</span>|
+| ReduceMean  | <span style=color:green>Yes</span> |<span style=color:green>Yes</span>|
+| Softmax     | <span style=color:green>Yes</span> |<span style=color:green>Yes</span>|
+| Sqrt        | <span style=color:green>Yes</span> |<span style=color:green>Yes</span>|
+| Sub         | <span style=color:green>Yes</span> |<span style=color:green>Yes</span>|
 | Transpose   | <span style=color:green>Yes</span> |<span style=color:green>Yes</span>|
 
 ## Syntax Highlighting in VSCode

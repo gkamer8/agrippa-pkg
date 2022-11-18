@@ -6,6 +6,7 @@
     <import from="tokens" dim="[var(ntokens), var(nvocab)]" />
     <import from="mask" dim="[var(ntokens), var(ntokens)]" />
     <import from="scale" dim="[1]" />
+    <import from="posembedmatrix" dim="[var(ntokens), var(dmodel)]" />
 
     <!-- Shrinks tokens into dmodel using a learned embedding -->
     <block title="Embedding">
@@ -21,8 +22,10 @@
     <!-- Not implemented - just an identity op -->
     <block title="PositionalEmbedding">
         <import from="embeddings" />
-        <node op="Identity">
+        <import from="posembedmatrix" />
+        <node op="Add">
             <input src="embeddings" />
+            <input src="posembedmatrix" />
             <output name="posembeddings" />
         </node>
         <export from="posembeddings" dim="[var(ntokens), var(dmodel)]" />
@@ -30,7 +33,7 @@
 
     <!-- The big decoder block -->
     <!-- NOT IMPLEMENTED YET -->
-    <block title="DecoderLayer" rep="2">
+    <block title="DecoderLayer">
         <import from="posembeddings" dim="[var(ntokens), var(dmodel)]" />
         <import from="scale" dim="[var(ntokens), var(ntokens)]" />
         <import from="mask" dim="[var(ntokens), var(ntokens)]" />
@@ -80,7 +83,7 @@
                     <input src="scale" />
                     <output name="scaled" />
                 </node>
-                <node title="Mask" op="Mul">
+                <node title="Mask" op="Add">
                     <input src="scaled" />
                     <input src="mask" />
                     <output name="masked" />
@@ -134,7 +137,7 @@
                 <output name="sigma" />
             </node>
             <node op="Div">
-                <params name="gain" dim="[1, var(dmodel)]" />
+                <params name="gain" dim="[1, var(dmodel)]" init="ones" />
                 <input src="sigma" />
                 <output name="gains" />
             </node>
@@ -145,7 +148,7 @@
             </node>
             <node op="Add">
                 <input src="gained" />
-                <params dim="[1, var(dmodel)]" name="biases" />
+                <params dim="[1, var(dmodel)]" name="biases" init="zeros" />
                 <output name="layer_norm_out" />
             </node>
             <export from="layer_norm_out" />
@@ -218,7 +221,7 @@
                 <output name="sigma2" />
             </node>
             <node op="Div">
-                <params name="gain2" dim="[1, var(dmodel)]" />
+                <params name="gain2" dim="[1, var(dmodel)]" init="ones" />
                 <input src="sigma2" />
                 <output name="gains2" />
             </node>
@@ -229,7 +232,7 @@
             </node>
             <node op="Add">
                 <input src="gained2" />
-                <params dim="[1, var(dmodel)]" name="biases2" />
+                <params dim="[1, var(dmodel)]" name="biases2" init="zeros" />
                 <output name="layer_norm_out2" />
             </node>
             <export from="layer_norm_out2" />
@@ -240,28 +243,25 @@
 
     <!-- Linear to get to vocab size, no softmax - basically reverse of embedding -->
     <!-- Weights could be shared with embedding, but are not here -->
-    <!--
+
     <block title="Linear">
-        <import from="posembeddings" />
+        <import from="layer_norm_out2" />
          <node op="MatMul">
-            <params name="RevEmbed" dim="[var(nvocab), var(dmodel)]" />
-            <input src="posembeddings" dim="[var(dmodel), var(ntokens)]" />
-            <output name="linear" dim="[var(nvocab), var(ntokens)]" />
+            <input src="layer_norm_out2" dim="[var(ntokens), var(dmodel)]" />
+            <params name="RevEmbed" dim="[var(dmodel), var(nvocab)]" />
+            <output name="end_linear" dim="[var(ntokens), var(nvocab)]" />
         </node>
-        <export from="linear" />
+        <export from="end_linear" />
     </block>
 
-    <block title="Softmax">
-        <import from="linear" />
-        <node op="Softmax" axis="0">
-            <input src="linear" dim="[var(nvocab), var(ntokens)]" />
-            <output name="softmax" dim="[var(nvocab), var(ntokens)]" />
+    <block title="EndSoftmax">
+        <import from="end_linear" />
+        <node op="Softmax" axis="-1">
+            <input src="end_linear" dim="[var(ntokens), var(nvocab)]" />
+            <output name="end_softmax" dim="[var(ntokens), var(nvocab)]" />
         </node>
-        <export from="softmax" />
+        <export from="end_softmax" />
     </block>
-    <export from="softmax" dim="[var(nvocab), var(ntokens)]" />
-        -->
-
-    <export from="layer_norm_out2" dim="[var(ntokens), var(dmodel)]" />
-
+    <export from="end_softmax" dim="[var(ntokens), var(nvocab)]" />
+    <export from="end_linear" dim="[var(ntokens), var(nvocab)]" />
 </model>
