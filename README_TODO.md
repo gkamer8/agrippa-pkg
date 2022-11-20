@@ -3,12 +3,11 @@
 A list of what's being worked on and what needs to be done.
 
 ## Documentation
-- Initialization arguments
+- None
 
 ## Implementation
 
 ### Minor
-- Finalize initialization decisions, provide for init arguments + document
 - Create "default" tag to set default initializations, other things
 
 ### Major
@@ -17,3 +16,4 @@ A list of what's being worked on and what needs to be done.
 - Clean up parse code, namespace situation
 - Better XML parse errors
 - Better error handling w.r.t. shape problems
+- Allow for defining constants as well as parameters

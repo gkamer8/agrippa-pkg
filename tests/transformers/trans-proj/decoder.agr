@@ -19,7 +19,6 @@
         <export from="embeddings" dim="[var(ntokens), var(dmodel)]" />
     </block>
 
-    <!-- Not implemented - just an identity op -->
     <block title="PositionalEmbedding">
         <import from="embeddings" />
         <import from="posembedmatrix" />

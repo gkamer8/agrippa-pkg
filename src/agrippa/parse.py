@@ -35,7 +35,7 @@ def _resolve_attr(text, bindings, expect_value=True):
         return json.loads(text)
     return text
 
-def _resolve_param(name, data_type, dims, weights, init_type="normal"):
+def _resolve_param(name, data_type, dims, weights, init_type="normal", init_args=None):
     if name in weights:
         try:
             tens = weights[name]
@@ -46,16 +46,33 @@ def _resolve_param(name, data_type, dims, weights, init_type="normal"):
                 vals=tens.flatten().tolist())
             return res
         except:
-            _notify(f"Error finding weight {name}; arbitarily initializing.")
+            _notify(f"Error loading weight {name}; arbitrarily initializing.")
 
-    _notify(f"Weight {name} not found; arbitrarily initializing")
+    _notify(f"Weight {name} not found; initializing")
 
     # Uniformly random between [-1, 1)
 
     if init_type == 'normal':
-        tens = np.random.normal(loc=0, scale=1, size=dims)
+        mu = 0
+        sigma = 1
+        if init_args is not None:
+            if len(init_args) < 2:
+                _notify(f"Init args for normal initialization has too few members ({len(init_args)} < 2); using mu=0, std=1")
+            else:
+                mu = init_args[0]
+                sigma = init_args[1]
+
+        tens = np.random.normal(loc=mu, scale=sigma, size=dims)
     elif init_type == 'uni_random':
-        tens = np.random.random(dims) * 2 - 1
+        a = -1
+        b = 1
+        if init_args is not None:
+            if len(init_args) < 2:
+                _notify(f"Init args for uniform random initialization has too few members ({len(init_args)} < 2); using a=-1, b=1")
+            else:
+                a = init_args[0]
+                b = init_args[1]
+        tens = np.random.random(dims) * (b - a) + a
     elif init_type == 'ones':
         tens = np.ones(dims)
     elif init_type == 'zeros':
@@ -278,15 +295,19 @@ def export(
                     init_type = _resolve_attr(param.attrib['init'], bindings, expect_value=False)
                 except:
                     init_type = "normal"
-
+                try:
+                    init_args = _resolve_attr(param.attrib['init_args'], bindings, expect_value=True)
+                except:
+                    init_args = None
+                
                 if shared == "no":
                     name = get_unique_param_name(orig_name)
-                    param_onnx = _resolve_param(name, ONNX_TYPE_DICT[dtype], dim, weights, init_type=init_type)
+                    param_onnx = _resolve_param(name, ONNX_TYPE_DICT[dtype], dim, weights, init_type=init_type, init_args=init_args)
                     all_inits.append(param_onnx)
                 else:
                     # First time we see it, even if we keep the name, need to initialize
                     if name not in parameter_repeats:
-                        param_onnx = _resolve_param(name, ONNX_TYPE_DICT[dtype], dim, weights, init_type=init_type)
+                        param_onnx = _resolve_param(name, ONNX_TYPE_DICT[dtype], dim, weights, init_type=init_type, init_args=init_args)
                         all_inits.append(param_onnx)
                         parameter_repeats[name] = 1  # so we don't do this next time
                 params.append(name)

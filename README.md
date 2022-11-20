@@ -94,6 +94,17 @@ Blocks may take a `rep` attribute, which defines how many times a block should b
 
 The `agrippa.export` function takes an optional argument, `bindings`. The `bindings` parameter is meant to be a dictionary of variables, set by the user, to replace areas in the markup file where the `var` function is used. For example, if an input tag has a `dim` attribute set to `"[var(image_width), var(image_height)]"`, a binding of `{'image_width': 512, 'image_height': '256'}` would set all occurances of `var(image_height)` to `512` and all occurances of `var(image_height)` to `256`. Note that in all cases, strings are used, since xml attributes require strings; the values are type-casted upon compilation.
 
+## Weight Initialization
+
+By default, weights are initialized with a standard normal distribution. There are ways to specify other initializations for each parameter, however. The `params` tag takes an optional `init` attribute along with an optional `init_args` attribute. The `init_args` attribute must always be some value (non-string), such as a list (e.g., `init_args="[2, 3]"`). Recall that all attributes are specified with double quotation marks) The options for initialization are:
+
+| Value    | Description    | Arguments |
+|----------|----------------|-----------|
+| normal   | Normally distributed | A list of two numbers, the first defining the mean and the second defining the standard deviation. |
+| uni_random  | Uniformly random in [a, b) | A list of two numbers, the first defining the a and the second defining b.|
+| zeros | All zeros | None |
+| ones  | All ones  | None |
+
 ## Other Rules
 
 ### Names

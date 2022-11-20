@@ -23,7 +23,14 @@ class OnnxTranspose(nn.Module, OnnxToTorchModule):  # pylint: disable=missing-cl
 
     def forward(self, input_tensor: torch.Tensor) -> torch.Tensor:  # pylint: disable=missing-function-docstring
         if self.perm is None:
-            self.perm = list(range(input_tensor.dim()))[::-1]
+            # The true ONNX default is the following: 
+            # self.perm = list(range(input_tensor.dim()))[::-1]
+            # However, it makes more sense for us to keep the batch dimension in place for purposes of training
+            dims = list(range(input_tensor.dim()))
+            if len(dims) > 2:
+                self.perm = [dims[0]] + dims[1:][::-1]
+            else:
+                self.perm = dims[::-1]
 
         return input_tensor.permute(self.perm)
 
