@@ -3,7 +3,7 @@
 A list of what's being worked on and what needs to be done.
 
 ## Documentation
-- None
+- Give details on every onnx command - note changed behavior of transpose operation w.r.t. pytorch batching
 
 ## Implementation
 
@@ -11,7 +11,7 @@ A list of what's being worked on and what needs to be done.
 - Create "default" tag to set default initializations, other things
 
 ### Major
-- Figure out batching in ONNX/PyTorch
+- Figure out batching in ONNX
 - "stretch" attribute for multi headed attention
 - Clean up parse code, namespace situation
 - Better XML parse errors

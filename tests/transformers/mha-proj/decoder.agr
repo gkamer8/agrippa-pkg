@@ -31,6 +31,7 @@
     </block>
 
     <!-- The big decoder block -->
+    <!-- NOT IMPLEMENTED YET -->
     <block title="DecoderLayer">
         <import from="posembeddings" dim="[var(ntokens), var(dmodel)]" />
         <import from="scale" dim="[var(ntokens), var(ntokens)]" />
@@ -98,12 +99,75 @@
             </block>            
             <export from="attended" />
         </block>
+
+        <block title="Attention_mha2">
+            <import from="posembeddings" dim="[var(ntokens), var(dmodel)]" />
+            <import from="scale" dim="[var(ntokens), var(ntokens)]" />
+            <import from="mask" dim="[var(ntokens), var(ntokens)]" />
+            <block title="LinearQKV">
+                <import from="posembeddings" />
+                <node op="MatMul">
+                    <input src="posembeddings" />
+                    <params name="QueryWeights_mha2" dim="[var(dmodel), var(dmodel)]" />
+                    <output name="queries_mha2" dims="[var(ntokens), var(dmodel)]" />
+                </node>
+                <node op="MatMul">
+                    <input src="posembeddings" />
+                    <params name="KeyWeights_mha2" dim="[var(dmodel), var(dmodel)]" />
+                    <output name="keys_mha2" dims="[var(ntokens), var(dmodel)]" />
+                </node>
+                <node op="MatMul">
+                    <input src="posembeddings" />
+                    <params name="ValueWeights_mha2" dim="[var(dmodel), var(dmodel)]" />
+                    <output name="values_mha2" dim="[var(ntokens), var(dmodel)]" />
+                </node>
+                <export from="queries_mha2" />
+                <export from="keys_mha2" />
+                <export from="values_mha2" />
+            </block>
+            <block title="ScaledDotProductAttention">
+                <import from="scale" dim="[var(ntokens), var(ntokens)]" />
+                <import from="mask" dim="[var(ntokens), var(ntokens)]" />
+                <import from="queries_mha2" />
+                <import from="values_mha2" />
+                <import from="keys_mha2" />
+                <node op="Transpose">
+                    <input src="keys_mha2" />
+                    <output name="keys_t_mha2" dim="[var(dmodel), var(ntokens)]" />
+                </node>
+                <node op="MatMul">
+                    <input src="queries_mha2" />
+                    <input src="keys_t_mha2" />
+                    <output name="matmul_mha2" dim="[var(ntokens), var(ntokens)]" />
+                </node>
+                <node op="Div">
+                    <input src="matmul_mha2" />
+                    <input src="scale" />
+                    <output name="scaled_mha2" />
+                </node>
+                <node title="Mask" op="Add">
+                    <input src="scaled_mha2" />
+                    <input src="mask" />
+                    <output name="masked_mha2" />
+                </node>
+                <node op="Softmax" axis="-1">
+                    <input src="masked_mha2" />
+                    <output name="softmaxed_mha2" />
+                </node>
+                <node op="MatMul" title="ValueMatmul">
+                    <input src="softmaxed_mha2" />
+                    <input src="values_mha2" />
+                    <output name="attended_mha2" dim="[var(ntokens), var(dmodel)]" />
+                </node>
+            </block>            
+            <export from="attended_mha2" />
+        </block>
         
         <block title="Add">
-            <import from="attended" />
+            <import from="attended_mha2" />
             <import from="posembeddings" />
             <node op="Add">
-                <input src="attended" />
+                <input src="attended_mha2" />
                 <input src="posembeddings" />
                 <output name="attended_added" />
             </node>
