@@ -1,10 +1,12 @@
 from math import exp
+from xml.dom import SyntaxErr
 import xml.etree.ElementTree as ET
 import onnx
 import json
 import numpy as np
 import os
 import pickle
+from agrippa.expr_parser import parse_expr
 
 WEIGHTS_FNAME = "weights.pkl"
 META_FNAME = "meta.json"
@@ -31,6 +33,53 @@ def _resolve_attr(text, bindings, expect_value=True):
     # detect unbound variable
     if text.find("var(") != -1:
         raise SyntaxWarning(f"Unbound variable found in attribute '{text}'")
+    
+    # If there's an expression, parse it
+    """
+    CHANGE THIS CODE TO:
+    - delinate the beginning and end of expr( and )
+    - delinate the beginning and end of the actual inner expression (simple offsets)
+    - make a "to replace" to call on the original text
+    """
+    to_replace = {}
+    total_offset = 0
+    remaining = text[total_offset:]
+    while remaining.find('expr(') != -1:
+        begin_call = text[total_offset:].find('expr(')
+        start_i = begin_call + len("expr(")
+        
+        expr = ""
+        end_place = -1
+        parens = []
+        for i, c in enumerate(remaining[start_i:]):
+            if c == ')':
+                if len(parens) == 0:
+                    end_place = i + start_i
+                    break
+                else:
+                    parens.pop()
+            elif c == '(':
+                parens.append('(')
+            else:
+                expr += c
+        
+        if end_place == -1:
+            raise SyntaxError(f"Mismatched parenthesis in expression '{text}'")
+        if not bindings:
+            bindings = {}
+
+        parsed_expr = parse_expr(expr, bindings=bindings)
+        end_call = end_place + len(")")
+
+        to_replace[remaining[begin_call:end_call]] = str(parsed_expr)
+
+        total_offset += end_call
+        remaining = text[total_offset:]
+
+    # Substitute the expressions for their values
+    for key in to_replace:
+        text = text.replace(key, to_replace[key])
+
     if expect_value:
         return json.loads(text)
     return text
@@ -383,6 +432,12 @@ def export(
                 inputs = splice_inputs(inputs, params, param_precedence)
                 if len(inputs) != 1:
                     raise SyntaxWarning(f"Sqrt should only have 1 input, yet it has {len(inputs)}")
+            elif op == "Concat":
+                inputs = splice_inputs(inputs, params, param_precedence)
+                try:
+                    kwargs["axis"] = _resolve_attr(node.attrib['axis'], bindings, expect_value=True)
+                except KeyError:
+                    raise SyntaxError(f"Expecting attribute 'axis' for Concat node")
 
             new_node = onnx.helper.make_node(
                 name=title,

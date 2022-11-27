@@ -19,8 +19,8 @@ bindings = {
     'ntokens': 3,
     'nvocab': 128,
     'dmodel': 12,
-    'nlayers': 4,
-    'dffnhidden': 32
+    'dffnhidden': 32,
+    'concat_w_height': 12 * 2
 }
 
 # Convert xml to onnx

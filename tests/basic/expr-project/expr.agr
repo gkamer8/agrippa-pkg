@@ -1,0 +1,25 @@
+<model script-version="0.0.1">
+
+    <import dim="[expr(3*2), expr(3  * 1)]" from="input" type="float32" />
+
+    <import dim="[expr(bound1*bound2), expr(bound2)]" from="input2" type="float32" />
+
+    <block title="SimpleRelu">
+        <node op="Relu">
+            <input src="input" />
+            <output name="y" />
+        </node>
+    </block>
+
+    <block title="SimpleRelu2">
+        <node op="Relu">
+            <input src="input2" />
+            <output name="y2" />
+        </node>
+    </block>
+
+    <export dim="[expr(3*2), expr(3)]" from="y" type="float32" />
+
+    <export dim="[expr( bound1    * bound2 ), expr( bound2 )]" from="y2" type="float32" />
+
+</model>

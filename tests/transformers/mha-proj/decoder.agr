@@ -162,12 +162,28 @@
             </block>            
             <export from="attended_mha2" />
         </block>
+
+        <block title="ConcatLinear">
+            <import from="attended_mha2" />
+            <import from="attended" />
+            <node op="Concat" axis="-1">
+                <input src="attended_mha2" />
+                <input src="attended" />
+                <output name="concatenated" />
+            </node>
+            <node op="MatMul">
+                <input src="concatenated" />
+                <params name="LinearConcatW" dim="[var(concat_w_height), var(dmodel)]" />
+                <output name="linear_concatenated" />
+            </node>
+            <export from="linear_concatenated" />
+        </block>
         
         <block title="Add">
-            <import from="attended_mha2" />
+            <import from="linear_concatenated" />
             <import from="posembeddings" />
             <node op="Add">
-                <input src="attended_mha2" />
+                <input src="linear_concatenated" />
                 <input src="posembeddings" />
                 <output name="attended_added" />
             </node>
