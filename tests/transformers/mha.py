@@ -18,9 +18,12 @@ onnx_fname = "decoder.onnx"
 bindings = {
     'ntokens': 3,
     'nvocab': 128,
-    'dmodel': 12,
+    'dmodel': 24,
     'dffnhidden': 32,
-    'concat_w_height': 12 * 2
+    'dvalues': 8,
+    'dqueries': 8,
+    'dkeys': 8,
+    'nheads': 2
 }
 
 # Convert xml to onnx

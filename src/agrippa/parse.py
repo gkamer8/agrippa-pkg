@@ -17,7 +17,7 @@ ONNX_TYPE_DICT = {
 
 DEFAULT_TYPE = "float32"
 
-suppress_prints = False
+suppress_prints = False  # global variable
 
 # For print statements
 def _notify(str):
@@ -25,7 +25,11 @@ def _notify(str):
     if not suppress_prints:
         print(str)
 
-# Variables in the file need to be of the form var(myVarName)
+"""
+Gets raw attribute text, a dictionary of global variable bindings
+Returns the true attribute value, with variables and expressions resolved
+expect_value is True if the return value is not meant to be a string
+"""
 def _resolve_attr(text, bindings, expect_value=True):
     if bindings:
         for key in bindings:
@@ -35,12 +39,6 @@ def _resolve_attr(text, bindings, expect_value=True):
         raise SyntaxWarning(f"Unbound variable found in attribute '{text}'")
     
     # If there's an expression, parse it
-    """
-    CHANGE THIS CODE TO:
-    - delinate the beginning and end of expr( and )
-    - delinate the beginning and end of the actual inner expression (simple offsets)
-    - make a "to replace" to call on the original text
-    """
     to_replace = {}
     total_offset = 0
     remaining = text[total_offset:]
@@ -84,6 +82,14 @@ def _resolve_attr(text, bindings, expect_value=True):
         return json.loads(text)
     return text
 
+
+"""
+Searches in the weights file for a corresponding weight value or creates a new initializer
+Options for init_type are:
+- normal, uni_random, ones, zeros
+- init_args takes parameterizations of those initialization types
+See the README for more info
+"""
 def _resolve_param(name, data_type, dims, weights, init_type="normal", init_args=None):
     if name in weights:
         try:
@@ -138,6 +144,15 @@ def _resolve_param(name, data_type, dims, weights, init_type="normal", init_args
     weights[name] = tens  # weights is an object, so this is allowed
     return res
 
+# Determines the output file name of the onnx model
+# outfile = what the user wants it named
+# infile = the project folder name, which is used as a default (with .onnx)
+def _get_output_model_name(outfile, infile):
+    if outfile:
+        return outfile
+    return infile + ".onnx"
+
+
 """
 def export(infile, ...)
 
@@ -159,12 +174,6 @@ def export(
 
     global suppress_prints
     suppress_prints = suppress
-    
-
-    def get_output_model_name():
-        if outfile:
-            return outfile
-        return infile + ".onnx"
 
     proj_dir = os.listdir(infile)
     arch_file = None
@@ -544,7 +553,7 @@ def export(
 
     onnx.checker.check_model(model_def)
 
-    onnx.save(model_def, get_output_model_name())
+    onnx.save(model_def, _get_output_model_name(outfile, infile))
 
     # Write the weights file if we're supposed to
     if write_weights:

@@ -45,18 +45,18 @@
                 <import from="posembeddings" />
                 <node op="MatMul">
                     <input src="posembeddings" />
-                    <params name="QueryWeights" dim="[var(dmodel), var(dmodel)]" />
-                    <output name="queries" dims="[var(ntokens), var(dmodel)]" />
+                    <params name="QueryWeights" dim="[var(dmodel), var(dqueries)]" />
+                    <output name="queries" dims="[var(ntokens), var(dqueries)]" />
                 </node>
                 <node op="MatMul">
                     <input src="posembeddings" />
-                    <params name="KeyWeights" dim="[var(dmodel), var(dmodel)]" />
-                    <output name="keys" dims="[var(ntokens), var(dmodel)]" />
+                    <params name="KeyWeights" dim="[var(dmodel), var(dkeys)]" />
+                    <output name="keys" dims="[var(ntokens), var(dkeys)]" />
                 </node>
                 <node op="MatMul">
                     <input src="posembeddings" />
-                    <params name="ValueWeights" dim="[var(dmodel), var(dmodel)]" />
-                    <output name="values" dim="[var(ntokens), var(dmodel)]" />
+                    <params name="ValueWeights" dim="[var(dmodel), var(dvalues)]" />
+                    <output name="values" dim="[var(ntokens), var(dvalues)]" />
                 </node>
                 <export from="queries" />
                 <export from="keys" />
@@ -70,7 +70,7 @@
                 <import from="keys" />
                 <node op="Transpose">
                     <input src="keys" />
-                    <output name="keys_t" dim="[var(dmodel), var(ntokens)]" />
+                    <output name="keys_t" dim="[var(dkeys), var(ntokens)]" />
                 </node>
                 <node op="MatMul">
                     <input src="queries" />
@@ -94,7 +94,7 @@
                 <node op="MatMul" title="ValueMatmul">
                     <input src="softmaxed" />
                     <input src="values" />
-                    <output name="attended" dim="[var(ntokens), var(dmodel)]" />
+                    <output name="attended" dim="[var(ntokens), var(dvalues)]" />
                 </node>
             </block>            
             <export from="attended" />
@@ -108,18 +108,18 @@
                 <import from="posembeddings" />
                 <node op="MatMul">
                     <input src="posembeddings" />
-                    <params name="QueryWeights_mha2" dim="[var(dmodel), var(dmodel)]" />
-                    <output name="queries_mha2" dims="[var(ntokens), var(dmodel)]" />
+                    <params name="QueryWeights_mha2" dim="[var(dmodel), var(dqueries)]" />
+                    <output name="queries_mha2" dims="[var(ntokens), var(dqueries)]" />
                 </node>
                 <node op="MatMul">
                     <input src="posembeddings" />
-                    <params name="KeyWeights_mha2" dim="[var(dmodel), var(dmodel)]" />
-                    <output name="keys_mha2" dims="[var(ntokens), var(dmodel)]" />
+                    <params name="KeyWeights_mha2" dim="[var(dmodel), var(dkeys)]" />
+                    <output name="keys_mha2" dims="[var(ntokens), var(dkeys)]" />
                 </node>
                 <node op="MatMul">
                     <input src="posembeddings" />
-                    <params name="ValueWeights_mha2" dim="[var(dmodel), var(dmodel)]" />
-                    <output name="values_mha2" dim="[var(ntokens), var(dmodel)]" />
+                    <params name="ValueWeights_mha2" dim="[var(dmodel), var(dvalues)]" />
+                    <output name="values_mha2" dim="[var(ntokens), var(dvalues)]" />
                 </node>
                 <export from="queries_mha2" />
                 <export from="keys_mha2" />
@@ -157,7 +157,7 @@
                 <node op="MatMul" title="ValueMatmul">
                     <input src="softmaxed_mha2" />
                     <input src="values_mha2" />
-                    <output name="attended_mha2" dim="[var(ntokens), var(dmodel)]" />
+                    <output name="attended_mha2" dim="[var(ntokens), var(values)]" />
                 </node>
             </block>            
             <export from="attended_mha2" />
@@ -173,7 +173,7 @@
             </node>
             <node op="MatMul">
                 <input src="concatenated" />
-                <params name="LinearConcatW" dim="[var(concat_w_height), var(dmodel)]" />
+                <params name="LinearConcatW" dim="[expr(dvalues * nheads), var(dmodel)]" />
                 <output name="linear_concatenated" />
             </node>
             <export from="linear_concatenated" />
