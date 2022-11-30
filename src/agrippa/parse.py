@@ -290,12 +290,23 @@ def export(
 
     name_resolves = {}  # an important data structure for dealing with repetitions and the resulting name changes
 
+    saved_to_concat_exports = {}  # block id -> dict orig export name -> lists of export names to concat
+
     # How many programming sins can we commit in the shortest amount of code?
     # A hellish mix of state and functional programming.
-    def parse_block(block, block_id, rep_index=0):
+    def parse_block(block, block_id, rep_index=0, stretch_index=0):
 
-        # Go through each node in the block
-        for node in block.findall('node'):
+        # Go through each child of the block
+        # Could be block or node
+        for node in block.findall('*'):
+
+            # Processing children in correct order w.r.t. nodes so that topological sort works
+            if node.tag == 'block':
+                parse_block(node, make_unique_block_id())
+                continue
+            elif node.tag != 'node':
+                continue
+
             try:
                 op = _resolve_attr(node.attrib['op'], bindings, expect_value=False)
             except KeyError:
@@ -447,7 +458,6 @@ def export(
                     kwargs["axis"] = _resolve_attr(node.attrib['axis'], bindings, expect_value=True)
                 except KeyError:
                     raise SyntaxError(f"Expecting attribute 'axis' for Concat node")
-
             new_node = onnx.helper.make_node(
                 name=title,
                 op_type=op,
@@ -457,10 +467,82 @@ def export(
             )
             all_nodes.append(new_node)
         
-        # child blocks
-        for new_block in block.findall('block'):
-            parse_block(new_block, make_unique_block_id())
         
+        """
+        Stretch:
+        
+        Change intermediate node output names, but keep
+            import names
+        Save new export names for later
+        Call parse block until stretch_index runs out
+        If we're the final one, create a new node that concats all the saved export names, and
+            this node should have output names associated with the original exports
+        Can't stretch with rep, so just return from function
+
+        """
+
+        try:
+            stretch = _resolve_attr(block.attrib['stretch'], bindings)
+        except KeyError:
+            stretch = 1
+        
+        if stretch > 1:
+
+            curr_exports = []
+
+            # MIGHT NEED TO CHANGE SO I CAN ACCESS INTERMEDIATE NAMES
+
+            # save the export resolves
+            for exp in block.findall('export'):
+                name = _resolve_attr(exp.attrib['from'], bindings, expect_value=False)
+                if block_id in saved_to_concat_exports:
+                    try:
+                        saved_to_concat_exports[block_id][name].append(name_resolves[name])
+                    except KeyError:
+                        saved_to_concat_exports[block_id][name].append(name)
+                else:
+                    try:
+                        saved_to_concat_exports[block_id] = {name: [name_resolves[name]]}
+                    except KeyError:
+                        saved_to_concat_exports[block_id] = {name: [name]}
+
+            if stretch_index < stretch - 1:
+                # change the intermediate node resolves
+                # Note that iter gets nested children as well
+                for node in block.iter('node'):
+                    for out_el in node.findall("output"):
+                        name = _resolve_attr(out_el.attrib['name'], bindings, expect_value=False)
+                        uni = get_unique_name(name)
+                        name_resolves[name] = uni  # for next rep
+                stretch_index += 1
+                parse_block(block, block_id, rep_index=rep_index, stretch_index=stretch_index)
+            else:
+                # Create concat nodes
+                for orig_name in saved_to_concat_exports[block_id]:                
+                    concat_inputs = saved_to_concat_exports[block_id][orig_name]
+                    new_name = orig_name + "$concat"
+                    new_name = get_unique_name(new_name)
+                    kwargs = {"axis": -1}  # will probably have to change, or provide options
+                    concat_node = onnx.helper.make_node(
+                        name=get_unique_node_name("stretch_concat"),
+                        op_type="Concat",
+                        inputs=concat_inputs,
+                        outputs=[new_name],
+                        **kwargs
+                    )
+                    all_nodes.append(concat_node)
+                    name_resolves[orig_name] = new_name
+
+        # Forget reps if we're stretching
+        if stretch > 1:
+            return
+
+        """
+        
+        Now dealing with reps
+
+        """
+
         # Does the block have a rep?
         try:
             rep = _resolve_attr(block.attrib['rep'], bindings)
