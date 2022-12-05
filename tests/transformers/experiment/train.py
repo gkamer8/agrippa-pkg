@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import data as my_data
 import torch.nn.functional as F
 
-batch_size = 16
+batch_size = 2
 seq_length = 128
 
 my_data.chunkify("dataset", "chunks", seq_length)
@@ -51,12 +51,15 @@ bindings = {
 """
 
 # Convert xml to onnx
-agrippa.export(proj_folder, onnx_fname, bindings=bindings, reinit=False, suppress=True)
+agrippa.export(proj_folder, onnx_fname, bindings=bindings, reinit=True, suppress=True)
 
 print("Exported")
 
+device = "cuda:0"
+
 # Now we train
 torch_model = agrippa.onnx_to_torch(onnx_fname)
+torch_model = torch_model.to(device)
 
 
 # Here is the idea, bruv:
@@ -91,15 +94,19 @@ def gen_data_tokens_pair():
         chopped = y[:, :-1]
         to_cat = torch.full((batch_size, 1), bos_token)
         x = torch.cat((to_cat, chopped), -1)
+        x = x.to(device)
+        y = y.to(device)
         yield x, y
 
 
 scale = math.sqrt(bindings['dkeys'])
+embed_scale = math.sqrt(bindings['dmodel'])
 
 # FIX THIS - TODO
 proto_mask = torch.full((batch_size, bindings['ntokens'], bindings['ntokens']), -float("inf"))
 proto_mask[:] = torch.triu(proto_mask[0], diagonal=1)
 mask = proto_mask
+mask = mask.to(device)
 
 # Straight from Vaswani et al
 posembeddingmatrix = torch.empty((batch_size, bindings['ntokens'], bindings['dmodel']))
@@ -110,7 +117,7 @@ for pos in range(len(posembeddingmatrix[0])):
             posembeddingmatrix[:, pos, i] = math.sin(pos/(10_000**(i/bindings['dmodel'])))
         else:
             posembeddingmatrix[:, pos, i] = math.cos(pos/(10_000**(i/bindings['dmodel'])))
-
+posembeddingmatrix = posembeddingmatrix.to(device)
 
 # Vaswani et al use label smoothing = 0.1
 loss_fn = torch.nn.CrossEntropyLoss(label_smoothing=0.1)
@@ -119,67 +126,22 @@ loss_fn = torch.nn.CrossEntropyLoss(label_smoothing=0.1)
 log_freq = 1
 loss_log = []
 
-lr_schedule = {
-    0:    0.001
-}
-
-current_lr = lr_schedule[0]
+current_lr = 0.001
 optimizer = torch.optim.Adam(torch_model.parameters(), lr=current_lr, betas=(0.9, 0.98), eps=1e-09)
 # optimizer = torch.optim.SGD(torch_model.parameters(), lr=current_lr)
 
 accum_loss = 0
 
-max_train_size = 1000
+max_train_size = 5
 
-gradient_accum_steps = 2
+gradient_accum_steps = 1
 
-warmup_steps = 4000
+warmup_steps = 100
 
-for i, (data, label) in enumerate(gen_data_tokens_pair()):
+start_buffer = 0
 
-    if i % log_freq == 0:
-        print(f"At step {i}")
-
-    if i in lr_schedule:
-        new_lr = bindings['dmodel'] ** (-.5) * min((i+1)**(-0.5), (i+1)*warmup_steps**(-1.5))
-        optimizer = torch.optim.Adam(torch_model.parameters(), lr=new_lr, betas=(0.9, 0.98), eps=1e-09)
-
-    # Add dimension to data
-    data = F.one_hot(data).float()
-
-    """ids_to_toks = my_data.get_ids_to_toks()
-    toks = ids_to_toks(label[0])
-    str = my_data.get_toks_to_str()(toks)
-    print(str)
-    exit(0)"""
-
-    # Make predictions for this batch
-    outputs = torch_model(data, mask, scale, posembeddingmatrix)
-
-    """oneoutputs = torch_model(data[0], mask[0], scale, posembeddingmatrix[0])
-    with open("bruh.pkl", 'wb') as fp:
-        pickle.dump(data[0], fp)
-    print(oneoutputs[0])
-    exit(0)"""
-
-    # Loss function expects labels in the form (Batch size, # Classes, other dimensions...)
-    train_output = outputs[1].permute((0, 2, 1))
-
-    # Compute the loss and its gradients
-    loss = loss_fn(train_output, label) / gradient_accum_steps
-    loss.backward()
-    accum_loss += loss.item()
-
-    if (i+1) % gradient_accum_steps == 0:
-        print("Optimizing...")
-        optimizer.step()
-        optimizer.zero_grad()
-        # Scale the loss by the gradient accumulation
-        loss_log.append(accum_loss)
-        accum_loss = 0
-
-    if i >= max_train_size:
-        break
+nepochs = 1
+train_size = max_train_size
 
 def save_model():
     weights_dict = {}
@@ -190,6 +152,49 @@ def save_model():
 
     with open(os.path.join("model", 'weights.pkl'), 'wb') as fhand:
         pickle.dump(weights_dict, fhand)
+
+for epoch in range(nepochs):
+    print(f"Epoch {epoch}")
+    counter = 0
+    new_lr = 0.01
+    for i, (data, label) in enumerate(gen_data_tokens_pair()):
+
+        if i % log_freq == 0:
+            print(f"At step {i}")
+
+        new_lr = bindings['dmodel'] ** (-.5) * min((start_buffer+i+1+epoch*(train_size))**(-0.5), (start_buffer+i+1+epoch*(train_size))*warmup_steps**(-1.5))
+        optimizer = torch.optim.Adam(torch_model.parameters(), lr=new_lr, betas=(0.9, 0.98), eps=1e-09)
+
+        # Add dimension to data
+        data = F.one_hot(data).float()
+
+        # Make predictions for this batch
+        outputs = torch_model(data, mask, scale, posembeddingmatrix, embed_scale)
+        # Loss function expects labels in the form (Batch size, # Classes, other dimensions...)
+        train_output = outputs[1].permute((0, 2, 1))
+
+        # Compute the loss and its gradients
+        loss = loss_fn(train_output, label) / gradient_accum_steps
+        loss.backward()
+        accum_loss += loss.item()
+
+        if (i+1) % gradient_accum_steps == 0:
+            print("Optimizing...")
+            optimizer.step()
+            optimizer.zero_grad()
+            # Scale the loss by the gradient accumulation
+            loss_log.append(accum_loss)
+            print(f"Loss: {accum_loss}")
+            accum_loss = 0
+
+        counter += 1
+        if i >= max_train_size:
+            break
+    if counter < train_size:
+        train_size = counter
+    print("Saving model...")
+    save_model()
+    print(f"Latest lr: {new_lr}")
     
 
 save_model()
@@ -198,4 +203,3 @@ print(loss_log)
 
 plt.plot(loss_log)
 plt.show()
-

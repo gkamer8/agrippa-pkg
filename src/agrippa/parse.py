@@ -109,7 +109,7 @@ def _resolve_param(name, data_type, dims, weights, init_type="normal", init_args
 
     if init_type == 'normal':
         mu = 0
-        sigma = 1
+        sigma = 0.05
         if init_args is not None:
             if len(init_args) < 2:
                 _notify(f"Init args for normal initialization has too few members ({len(init_args)} < 2); using mu=0, std=1")

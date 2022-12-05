@@ -33,17 +33,17 @@ seq_length = len(tokens)
 bindings = {
     'ntokens': seq_length,
     'nvocab': 50257,
-    'dmodel': 256,
-    'dffnhidden': 1024,
-    'dvalues': 32,
-    'dqueries': 32,
-    'dkeys': 32,
+    'dmodel': 512,
+    'dffnhidden': 2048,
+    'dvalues': 64,
+    'dqueries': 64,
+    'dkeys': 64,
     'nheads': 8,
     'nlayers': 6
 }
 
 # Convert xml to onnx
-# agrippa.export(proj_folder, onnx_fname, bindings=bindings, reinit=False, suppress=True)
+agrippa.export(proj_folder, onnx_fname, bindings=bindings, reinit=False, suppress=True)
 
 torch_model = agrippa.onnx_to_torch(onnx_fname)
 
@@ -54,6 +54,7 @@ x = torch.cat((to_cat, chopped), -1)
 data = F.one_hot(x, num_classes=50257).float()
 
 scale = math.sqrt(bindings['dmodel'])
+embed_scale = math.sqrt(bindings['dmodel'])
 
 proto_mask = torch.full((bindings['ntokens'], bindings['ntokens']), -float("inf"))
 proto_mask = torch.triu(proto_mask, diagonal=1)
@@ -70,13 +71,24 @@ for pos in range(len(posembeddingmatrix)):
             posembeddingmatrix[pos, i] = math.cos(pos/(10_000**(i/bindings['dmodel'])))
 
 # Make predictions for this batch
-outputs = torch_model(data, mask, scale, posembeddingmatrix)
+outputs = torch_model(data, mask, scale, posembeddingmatrix, embed_scale)
 
-y = torch.topk(outputs[0], k=5, dim=1)[1]
+print(outputs[0])
 
-z = y[:, 4].flatten()
+topk = torch.topk(outputs[0], k=20, dim=1)[1]
 
-y = tokenizer.convert_ids_to_tokens(list(z))
+tops = topk[:, 0].flatten()
+
+y = tokenizer.convert_ids_to_tokens(list(tops))
 
 my_str = tokenizer.convert_tokens_to_string(y)
+print("First STR:")
+print(my_str)
+
+tops = topk[:, 19].flatten()
+
+y = tokenizer.convert_ids_to_tokens(list(tops))
+
+my_str = tokenizer.convert_tokens_to_string(y)
+print("Second STR:")
 print(my_str)

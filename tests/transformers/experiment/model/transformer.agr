@@ -7,13 +7,28 @@
     <import from="mask" dim="[var(ntokens), var(ntokens)]" />
     <import from="scale" dim="[1]" />
     <import from="posembedmatrix" dim="[var(ntokens), var(dmodel)]" />
+    <import from="embed_scale" dim="[1]" />
+
+    <block title="ShrunkEmbed">
+        <node op="Identity">
+            <params name="EmbedW" dim="[var(nvocab), var(dmodel)]" />
+            <output name="Embed" />
+        </node>
+        <node op="Div">
+            <input src="Embed" dim="[var(nvocab), var(dmodel)]" />
+            <input src="embed_scale" />
+            <output name="EmbedShrunk" />
+        </node>
+        <export from="EmbedShrunk" />
+        <export from="Embed" />
+    </block>
 
     <!-- Shrinks tokens into dmodel using a learned embedding -->
     <block title="Embedding">
         <import from="tokens" />
         <node op="MatMul" title="EmbedProjection">
             <input src="tokens" />
-            <params name="Embed" dim="[var(nvocab), var(dmodel)]" />
+            <input src="EmbedShrunk" />
             <output name="embeddings" />
         </node>
         <export from="embeddings" dim="[var(ntokens), var(dmodel)]" />
@@ -167,14 +182,14 @@
             <import from="layer_norm_out" />
             <node op="MatMul">
                 <input src="layer_norm_out" />
-                <params name="ffn_w" dim="[var(dmodel), var(dffnhidden)]" />
+                <params name="ffn_w" dim="[var(dmodel), var(dffnhidden)]" init="normal" init_args="[0, 0.001]" />
                 <output name="ffn_projected" dim="[var(ntokens), var(dffnhidden)]" />
             </node>
             <node op="Add" title="FFNBiases" >
                 <input src="ffn_projected" />
                 <!-- Note that the biases are numpy style broadcasted,
                         so the FFN remains identical for each position -->
-                <params name="ffn_b" dim="[var(dffnhidden)]" />
+                <params name="ffn_b" dim="[var(dffnhidden)]" init="ones" />
                 <output name="ffn_biased" />
             </node>
             <node op="Relu">
@@ -251,13 +266,21 @@
     </block>
 
     <!-- Linear to get to vocab size, no softmax - basically reverse of embedding -->
-    <!-- Weights could be shared with embedding, but are not here -->
+
+    <block title="GetRevEmbedWeights">
+        <import from="Embed" />
+        <node op="Transpose">
+            <input src="Embed" />
+            <output name="RevEmbed" />
+        </node>
+        <export from="RevEmbed" />
+    </block>
 
     <block title="Linear">
         <import from="layer_norm_out2" />
          <node op="MatMul">
             <input src="layer_norm_out2" dim="[var(ntokens), var(dmodel)]" />
-            <params name="RevEmbed" dim="[var(dmodel), var(nvocab)]" />
+            <input src="RevEmbed" dim="[var(dmodel), var(nvocab)]" />
             <output name="end_linear" dim="[var(ntokens), var(nvocab)]" />
         </node>
         <export from="end_linear" />
