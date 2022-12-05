@@ -15,7 +15,7 @@ import data as my_data
 import torch.nn.functional as F
 
 batch_size = 2
-seq_length = 128
+seq_length = 64
 
 my_data.chunkify("dataset", "chunks", seq_length)
 my_data.batchify('dataset', 'batches', batch_size, 'chunks')
@@ -61,17 +61,6 @@ device = "cuda:0"
 torch_model = agrippa.onnx_to_torch(onnx_fname)
 torch_model = torch_model.to(device)
 
-
-# Here is the idea, bruv:
-# index 0 = a
-# index 1 = b
-# index 2 = c
-
-# Every sequence starts with a or b (50% prob)
-# If the sequence starts with an a, second is b
-# Otherwise, second is c
-# BOS tag is index 127
-
 nbatches = my_data.get_n_batches(os.path.join('dataset', 'batches', 'meta.json'))
 batch_order = [i for i in range(nbatches)]
 np.random.shuffle(batch_order)
@@ -101,12 +90,14 @@ def gen_data_tokens_pair():
 
 scale = math.sqrt(bindings['dkeys'])
 embed_scale = math.sqrt(bindings['dmodel'])
+ln_eps = 1e-5
 
 # FIX THIS - TODO
 proto_mask = torch.full((batch_size, bindings['ntokens'], bindings['ntokens']), -float("inf"))
 proto_mask[:] = torch.triu(proto_mask[0], diagonal=1)
 mask = proto_mask
 mask = mask.to(device)
+print(mask)
 
 # Straight from Vaswani et al
 posembeddingmatrix = torch.empty((batch_size, bindings['ntokens'], bindings['dmodel']))
@@ -153,6 +144,7 @@ def save_model():
     with open(os.path.join("model", 'weights.pkl'), 'wb') as fhand:
         pickle.dump(weights_dict, fhand)
 
+optim_steps = 1
 for epoch in range(nepochs):
     print(f"Epoch {epoch}")
     counter = 0
@@ -162,14 +154,14 @@ for epoch in range(nepochs):
         if i % log_freq == 0:
             print(f"At step {i}")
 
-        new_lr = bindings['dmodel'] ** (-.5) * min((start_buffer+i+1+epoch*(train_size))**(-0.5), (start_buffer+i+1+epoch*(train_size))*warmup_steps**(-1.5))
+        new_lr = bindings['dmodel'] ** (-.5) * min(optim_steps**(-0.5), optim_steps*warmup_steps**(-1.5))
         optimizer = torch.optim.Adam(torch_model.parameters(), lr=new_lr, betas=(0.9, 0.98), eps=1e-09)
 
         # Add dimension to data
         data = F.one_hot(data).float()
 
         # Make predictions for this batch
-        outputs = torch_model(data, mask, scale, posembeddingmatrix, embed_scale)
+        outputs = torch_model(data, mask, scale, posembeddingmatrix, embed_scale, ln_eps)
         # Loss function expects labels in the form (Batch size, # Classes, other dimensions...)
         train_output = outputs[1].permute((0, 2, 1))
 
@@ -186,9 +178,10 @@ for epoch in range(nepochs):
             loss_log.append(accum_loss)
             print(f"Loss: {accum_loss}")
             accum_loss = 0
+            optim_steps += 1
 
         counter += 1
-        if i >= max_train_size:
+        if counter >= max_train_size:
             break
     if counter < train_size:
         train_size = counter
@@ -200,6 +193,3 @@ for epoch in range(nepochs):
 save_model()
 print(loss_log[-1])
 print(loss_log)
-
-plt.plot(loss_log)
-plt.show()

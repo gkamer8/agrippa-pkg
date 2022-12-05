@@ -8,6 +8,7 @@
     <import from="scale" dim="[1]" />
     <import from="posembedmatrix" dim="[var(ntokens), var(dmodel)]" />
     <import from="embed_scale" dim="[1]" />
+    <import from="ln_eps" dim="[1]" />
 
     <block title="ShrunkEmbed">
         <node op="Identity">
@@ -49,9 +50,10 @@
     <!-- NOT IMPLEMENTED YET -->
     <block title="DecoderLayer" rep="var(nlayers)">
         <import from="posembeddings" dim="[var(ntokens), var(dmodel)]" />
-        <import from="scale" dim="[var(ntokens), var(ntokens)]" />
+        <import from="scale" />
         <import from="mask" dim="[var(ntokens), var(ntokens)]" />
-       
+	<import from="ln_eps" />
+
         <block title="Attention" stretch="var(nheads)">
             <import from="posembeddings" dim="[var(ntokens), var(dmodel)]" />
             <import from="scale" dim="[var(ntokens), var(ntokens)]" />
@@ -156,8 +158,13 @@
                 <input src="squared" />
                 <output name="sigma_squared" />
             </node>
+	    <node op="Add">
+	    	 <input src="sigma_squared" />
+		 <input src="ln_eps" />
+		 <output name="stable" />
+	    </node>
             <node op="Sqrt">
-                <input src="sigma_squared" />
+                <input src="stable" />
                 <output name="sigma" />
             </node>
             <node op="Div">
@@ -182,14 +189,14 @@
             <import from="layer_norm_out" />
             <node op="MatMul">
                 <input src="layer_norm_out" />
-                <params name="ffn_w" dim="[var(dmodel), var(dffnhidden)]" init="normal" init_args="[0, 0.001]" />
+                <params name="ffn_w" dim="[var(dmodel), var(dffnhidden)]" init="normal" init_args="[0, 0.0005]" />
                 <output name="ffn_projected" dim="[var(ntokens), var(dffnhidden)]" />
             </node>
             <node op="Add" title="FFNBiases" >
                 <input src="ffn_projected" />
                 <!-- Note that the biases are numpy style broadcasted,
                         so the FFN remains identical for each position -->
-                <params name="ffn_b" dim="[var(dffnhidden)]" init="ones" />
+                <params name="ffn_b" dim="[var(dffnhidden)]" init="zeros" />
                 <output name="ffn_biased" />
             </node>
             <node op="Relu">
@@ -198,12 +205,12 @@
             </node>
             <node op="MatMul">
                 <input src="ffn_relu" />
-                <params name="ffn_w2" dim="[var(dffnhidden), var(dmodel)]" />
+                <params name="ffn_w2" dim="[var(dffnhidden), var(dmodel)]" init="normal" init_args="[0, 0.0005]" />
                 <output name="ffn_second_proj" />
             </node>
             <node op="Add" title="FFNBiases2">
                 <input src="ffn_second_proj" />
-                <params name="ffn_b2" dim="[var(dmodel)]" />
+                <params name="ffn_b2" dim="[var(dmodel)]" init="zeros" />
                 <output name="ffn_out" />
             </node>
             <export from="ffn_out" />
@@ -240,8 +247,13 @@
                 <input src="squared2" />
                 <output name="sigma_squared2" />
             </node>
+	    <node op="Add">
+	    	 <input src="sigma_squared2" />
+		 <input src="ln_eps" />
+		 <output name="stable2" />
+	    </node>
             <node op="Sqrt">
-                <input src="sigma_squared2" />
+                <input src="stable2" />
                 <output name="sigma2" />
             </node>
             <node op="Div">
