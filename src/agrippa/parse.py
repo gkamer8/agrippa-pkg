@@ -7,6 +7,7 @@ import numpy as np
 import os
 import pickle
 from agrippa.expr_parser import parse_expr
+import math
 
 WEIGHTS_FNAME = "weights.pkl"
 META_FNAME = "meta.json"
@@ -16,6 +17,7 @@ ONNX_TYPE_DICT = {
 }
 
 DEFAULT_TYPE = "float32"
+DEFAULT_INIT_TYPE = "xavier"
 
 suppress_prints = False  # global variable
 
@@ -90,7 +92,7 @@ Options for init_type are:
 - init_args takes parameterizations of those initialization types
 See the README for more info
 """
-def _resolve_param(name, data_type, dims, weights, init_type="normal", init_args=None):
+def _resolve_param(name, data_type, dims, weights, init_type=DEFAULT_INIT_TYPE, init_args=None):
     if name in weights:
         try:
             tens = weights[name]
@@ -104,19 +106,24 @@ def _resolve_param(name, data_type, dims, weights, init_type="normal", init_args
             _notify(f"Error loading weight {name}; arbitrarily initializing.")
 
     _notify(f"Weight {name} not found; initializing")
-
-    # Uniformly random between [-1, 1)
-
-    if init_type == 'normal':
+    if init_type == 'xavier':
+        # Get the sum of the last two dimensions
+        # If there is only one, use just that one
+        stdev = 1
+        if len(dims) >= 2:
+            stdev = math.sqrt(2. / (dims[-1] + dims[-2]))
+        elif len(dims) == 1:
+            stdev = 1. * math.sqrt(dims[0])
+        tens = np.random.normal(loc=0., scale=stdev, size=dims)
+    elif init_type == 'normal':
         mu = 0
-        sigma = 0.05
+        sigma = 1
         if init_args is not None:
             if len(init_args) < 2:
                 _notify(f"Init args for normal initialization has too few members ({len(init_args)} < 2); using mu=0, std=1")
             else:
                 mu = init_args[0]
                 sigma = init_args[1]
-
         tens = np.random.normal(loc=mu, scale=sigma, size=dims)
     elif init_type == 'uni_random':
         a = -1
@@ -363,7 +370,7 @@ def export(
                 try:
                     init_type = _resolve_attr(param.attrib['init'], bindings, expect_value=False)
                 except:
-                    init_type = "normal"
+                    init_type = DEFAULT_INIT_TYPE
                 try:
                     init_args = _resolve_attr(param.attrib['init_args'], bindings, expect_value=True)
                 except:

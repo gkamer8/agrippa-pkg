@@ -10,17 +10,18 @@
     <import from="embed_scale" dim="[1]" />
     <import from="ln_eps" dim="[1]" />
 
-    <block title="ShrunkEmbed">
+    <block title="GrownEmbed">
+        <import from="embed_scale" />
         <node op="Identity">
             <params name="EmbedW" dim="[var(nvocab), var(dmodel)]" />
             <output name="Embed" />
         </node>
-        <node op="Div">
+        <node op="Mul">
             <input src="Embed" dim="[var(nvocab), var(dmodel)]" />
             <input src="embed_scale" />
-            <output name="EmbedShrunk" />
+            <output name="EmbedGrown" />
         </node>
-        <export from="EmbedShrunk" />
+        <export from="EmbedGrown" />
         <export from="Embed" />
     </block>
 
@@ -29,7 +30,7 @@
         <import from="tokens" />
         <node op="MatMul" title="EmbedProjection">
             <input src="tokens" />
-            <input src="EmbedShrunk" />
+            <input src="EmbedGrown" />
             <output name="embeddings" />
         </node>
         <export from="embeddings" dim="[var(ntokens), var(dmodel)]" />
@@ -47,31 +48,78 @@
     </block>
 
     <!-- The big decoder block -->
-    <!-- NOT IMPLEMENTED YET -->
     <block title="DecoderLayer" rep="var(nlayers)">
         <import from="posembeddings" dim="[var(ntokens), var(dmodel)]" />
         <import from="scale" />
         <import from="mask" dim="[var(ntokens), var(ntokens)]" />
-	<import from="ln_eps" />
+	    <import from="ln_eps" />
+
+        <!-- This is an LN-first implementation -->
+        <block title="LayerNorm">
+            <import from="posembeddings" />
+            <node op="ReduceMean" axes="[-1]">
+                <input src="posembeddings" />
+                <output name="means" />
+            </node>
+            <node op="Sub">
+                <input src="posembeddings" />
+                <input src="means" />
+                <output name="centered" />
+            </node>
+            <node op="Mul">
+                <input src="centered" />
+                <input src="centered" />
+                <output name="squared" />
+            </node>
+            <node op="ReduceMean" axes="[-1]">
+                <input src="squared" />
+                <output name="sigma_squared" />
+            </node>
+            <node op="Add">
+                <input src="sigma_squared" />
+                <input src="ln_eps" />
+                <output name="stable" />
+            </node>
+            <node op="Sqrt">
+                <input src="stable" />
+                <output name="sigma" />
+            </node>
+            <node op="Div">
+                <params name="gain" dim="[1, var(dmodel)]" init="ones" />
+                <input src="sigma" />
+                <output name="gains" />
+            </node>
+            <node op="Mul">
+                <input src="centered" />
+                <input src="gains" />
+                <output name="gained" />
+            </node>
+            <node op="Add">
+                <input src="gained" />
+                <params dim="[1, var(dmodel)]" name="biases" init="zeros" />
+                <output name="layer_norm_out" />
+            </node>
+            <export from="layer_norm_out" />
+        </block>
 
         <block title="Attention" stretch="var(nheads)">
-            <import from="posembeddings" dim="[var(ntokens), var(dmodel)]" />
+            <import from="layer_norm_out" dim="[var(ntokens), var(dmodel)]" />
             <import from="scale" dim="[var(ntokens), var(ntokens)]" />
             <import from="mask" dim="[var(ntokens), var(ntokens)]" />
             <block title="LinearQKV">
-                <import from="posembeddings" />
+                <import from="layer_norm_out" />
                 <node op="MatMul">
-                    <input src="posembeddings" />
+                    <input src="layer_norm_out" />
                     <params name="QueryWeights" dim="[var(dmodel), var(dqueries)]" />
                     <output name="queries" dims="[var(ntokens), var(dqueries)]" />
                 </node>
                 <node op="MatMul">
-                    <input src="posembeddings" />
+                    <input src="layer_norm_out" />
                     <params name="KeyWeights" dim="[var(dmodel), var(dkeys)]" />
                     <output name="keys" dims="[var(ntokens), var(dkeys)]" />
                 </node>
                 <node op="MatMul">
-                    <input src="posembeddings" />
+                    <input src="layer_norm_out" />
                     <params name="ValueWeights" dim="[var(dmodel), var(dvalues)]" />
                     <output name="values" dim="[var(ntokens), var(dvalues)]" />
                 </node>
@@ -138,103 +186,14 @@
             <export from="attended_added" />
         </block>
 
-        <block title="LayerNorm">
+        <block title="LayerNorm2">
             <import from="attended_added" />
             <node op="ReduceMean" axes="[-1]">
                 <input src="attended_added" />
-                <output name="means" />
-            </node>
-            <node op="Sub">
-                <input src="attended_added" />
-                <input src="means" />
-                <output name="centered" />
-            </node>
-            <node op="Mul">
-                <input src="centered" />
-                <input src="centered" />
-                <output name="squared" />
-            </node>
-            <node op="ReduceMean" axes="[-1]">
-                <input src="squared" />
-                <output name="sigma_squared" />
-            </node>
-	    <node op="Add">
-	    	 <input src="sigma_squared" />
-		 <input src="ln_eps" />
-		 <output name="stable" />
-	    </node>
-            <node op="Sqrt">
-                <input src="stable" />
-                <output name="sigma" />
-            </node>
-            <node op="Div">
-                <params name="gain" dim="[1, var(dmodel)]" init="ones" />
-                <input src="sigma" />
-                <output name="gains" />
-            </node>
-            <node op="Mul">
-                <input src="centered" />
-                <input src="gains" />
-                <output name="gained" />
-            </node>
-            <node op="Add">
-                <input src="gained" />
-                <params dim="[1, var(dmodel)]" name="biases" init="zeros" />
-                <output name="layer_norm_out" />
-            </node>
-            <export from="layer_norm_out" />
-        </block>
-
-        <block title="FFN">
-            <import from="layer_norm_out" />
-            <node op="MatMul">
-                <input src="layer_norm_out" />
-                <params name="ffn_w" dim="[var(dmodel), var(dffnhidden)]" init="normal" init_args="[0, 0.0005]" />
-                <output name="ffn_projected" dim="[var(ntokens), var(dffnhidden)]" />
-            </node>
-            <node op="Add" title="FFNBiases" >
-                <input src="ffn_projected" />
-                <!-- Note that the biases are numpy style broadcasted,
-                        so the FFN remains identical for each position -->
-                <params name="ffn_b" dim="[var(dffnhidden)]" init="zeros" />
-                <output name="ffn_biased" />
-            </node>
-            <node op="Relu">
-                <input src="ffn_biased" />
-                <output name="ffn_relu" />
-            </node>
-            <node op="MatMul">
-                <input src="ffn_relu" />
-                <params name="ffn_w2" dim="[var(dffnhidden), var(dmodel)]" init="normal" init_args="[0, 0.0005]" />
-                <output name="ffn_second_proj" />
-            </node>
-            <node op="Add" title="FFNBiases2">
-                <input src="ffn_second_proj" />
-                <params name="ffn_b2" dim="[var(dmodel)]" init="zeros" />
-                <output name="ffn_out" />
-            </node>
-            <export from="ffn_out" />
-        </block>
-
-        <block title="Add2">
-            <import from="ffn_out" />
-            <import from="layer_norm_out" />
-            <node op="Add">
-                <input src="ffn_out" />
-                <input src="layer_norm_out" />
-                <output name="attended_added2" />
-            </node>
-            <export from="attended_added2" />
-        </block>
-
-        <block title="LayerNorm2">
-            <import from="attended_added2" />
-            <node op="ReduceMean" axes="[-1]">
-                <input src="attended_added2" />
                 <output name="means2" />
             </node>
             <node op="Sub">
-                <input src="attended_added2" />
+                <input src="attended_added" />
                 <input src="means2" />
                 <output name="centered2" />
             </node>
@@ -247,11 +206,11 @@
                 <input src="squared2" />
                 <output name="sigma_squared2" />
             </node>
-	    <node op="Add">
-	    	 <input src="sigma_squared2" />
-		 <input src="ln_eps" />
-		 <output name="stable2" />
-	    </node>
+            <node op="Add">
+                <input src="sigma_squared2" />
+                <input src="ln_eps" />
+                <output name="stable2" />
+            </node>
             <node op="Sqrt">
                 <input src="stable2" />
                 <output name="sigma2" />
@@ -274,7 +233,49 @@
             <export from="layer_norm_out2" />
         </block>
 
-        <export from="layer_norm_out2" />
+        <block title="FFN">
+            <import from="layer_norm_out2" />
+            <node op="MatMul">
+                <input src="layer_norm_out2" />
+                <params name="ffn_w" dim="[var(dmodel), var(dffnhidden)]" />
+                <output name="ffn_projected" dim="[var(ntokens), var(dffnhidden)]" />
+            </node>
+            <node op="Add" title="FFNBiases" >
+                <input src="ffn_projected" />
+                <!-- Note that the biases are numpy style broadcasted,
+                        so the FFN remains identical for each position -->
+                <params name="ffn_b" dim="[var(dffnhidden)]" init="zeros" />
+                <output name="ffn_biased" />
+            </node>
+            <node op="Relu">
+                <input src="ffn_biased" />
+                <output name="ffn_relu" />
+            </node>
+            <node op="MatMul">
+                <input src="ffn_relu" />
+                <params name="ffn_w2" dim="[var(dffnhidden), var(dmodel)]" />
+                <output name="ffn_second_proj" />
+            </node>
+            <node op="Add" title="FFNBiases2">
+                <input src="ffn_second_proj" />
+                <params name="ffn_b2" dim="[var(dmodel)]" init="zeros" />
+                <output name="ffn_out" />
+            </node>
+            <export from="ffn_out" />
+        </block>
+
+        <block title="Add2">
+            <import from="ffn_out" />
+            <import from="attended_added" />
+            <node op="Add">
+                <input src="ffn_out" />
+                <input src="attended_added" />
+                <output name="attended_added2" />
+            </node>
+            <export from="attended_added2" />
+        </block>
+
+        <export from="attended_added2" />
     </block>
 
     <!-- Linear to get to vocab size, no softmax - basically reverse of embedding -->

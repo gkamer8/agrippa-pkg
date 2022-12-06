@@ -36,20 +36,6 @@ bindings = {
     'nlayers': 6
 }
 
-"""
-bindings = {
-    'ntokens': 3,
-    'nvocab': 128,
-    'dmodel': 24,
-    'dffnhidden': 32,
-    'dvalues': 8,
-    'dqueries': 8,
-    'dkeys': 8,
-    'nheads': 2,
-    'nlayers': 2
-}
-"""
-
 # Convert xml to onnx
 agrippa.export(proj_folder, onnx_fname, bindings=bindings, reinit=True, suppress=True)
 
@@ -87,17 +73,14 @@ def gen_data_tokens_pair():
         y = y.to(device)
         yield x, y
 
-
 scale = math.sqrt(bindings['dkeys'])
 embed_scale = math.sqrt(bindings['dmodel'])
 ln_eps = 1e-5
 
-# FIX THIS - TODO
 proto_mask = torch.full((batch_size, bindings['ntokens'], bindings['ntokens']), -float("inf"))
 proto_mask[:] = torch.triu(proto_mask[0], diagonal=1)
 mask = proto_mask
 mask = mask.to(device)
-print(mask)
 
 # Straight from Vaswani et al
 posembeddingmatrix = torch.empty((batch_size, bindings['ntokens'], bindings['dmodel']))
@@ -117,7 +100,7 @@ loss_fn = torch.nn.CrossEntropyLoss(label_smoothing=0.1)
 log_freq = 1
 loss_log = []
 
-current_lr = 0.001
+current_lr = 0
 optimizer = torch.optim.Adam(torch_model.parameters(), lr=current_lr, betas=(0.9, 0.98), eps=1e-09)
 # optimizer = torch.optim.SGD(torch_model.parameters(), lr=current_lr)
 
@@ -154,6 +137,7 @@ for epoch in range(nepochs):
         if i % log_freq == 0:
             print(f"At step {i}")
 
+        # LR With warmup
         new_lr = bindings['dmodel'] ** (-.5) * min(optim_steps**(-0.5), optim_steps*warmup_steps**(-1.5))
         optimizer = torch.optim.Adam(torch_model.parameters(), lr=new_lr, betas=(0.9, 0.98), eps=1e-09)
 
