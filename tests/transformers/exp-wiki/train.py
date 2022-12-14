@@ -16,6 +16,9 @@ import torch.nn.functional as F
 batch_size = 200
 seq_length = 64
 
+# To make things easier when we need to use a smaller batch
+effective_batch_size = batch_size // 4
+
 proj_folder = "model"
 onnx_fname = "decoder.onnx"
 
@@ -23,12 +26,12 @@ onnx_fname = "decoder.onnx"
 bindings = {
     'ntokens': seq_length,
     'nvocab': 50257,
-    'dmodel': 512,
-    'dffnhidden': 2048,
+    'dmodel': 1024,
+    'dffnhidden': 4096,
     'dvalues': 64,
     'dqueries': 64,
     'dkeys': 64,
-    'nheads': 8,
+    'nheads': 16,
     'nlayers': 6
 }
 
@@ -66,21 +69,29 @@ def gen_data_tokens_pair():
         chopped = y[:, :-1]
         to_cat = torch.full((batch_size, 1), bos_token)
         x = torch.cat((to_cat, chopped), -1)
-        x = x.to(device)
-        y = y.to(device)
-        yield x, y
+
+        for piece in range(0, batch_size, effective_batch_size):
+            x_real = x[piece*effective_batch_size:(piece+1)*effective_batch_size]
+            x_real = x_real.to(device)
+
+            y_real = y[piece*effective_batch_size:(piece+1)*effective_batch_size]
+            y_real = y_real.to(device)
+
+            print("Effectively:")
+            print(len(x_real))
+            yield x_real, y_real
 
 scale = math.sqrt(bindings['dkeys'])
 embed_scale = math.sqrt(bindings['dmodel'])
 ln_eps = 1e-5
 
-proto_mask = torch.full((batch_size, bindings['ntokens'], bindings['ntokens']), -float("inf"))
+proto_mask = torch.full((effective_batch_size, bindings['ntokens'], bindings['ntokens']), -float("inf"))
 proto_mask[:] = torch.triu(proto_mask[0], diagonal=1)
 mask = proto_mask
 mask = mask.to(device)
 
 # Straight from Vaswani et al
-posembeddingmatrix = torch.empty((batch_size, bindings['ntokens'], bindings['dmodel']))
+posembeddingmatrix = torch.empty((effective_batch_size, bindings['ntokens'], bindings['dmodel']))
 for pos in range(len(posembeddingmatrix[0])):
     for i in range(len(posembeddingmatrix[0][0])):
         # Even indices get one thing, odd the other

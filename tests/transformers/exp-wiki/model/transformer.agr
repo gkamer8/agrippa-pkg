@@ -33,44 +33,44 @@
         <import from="embeddings" />
         <node op="ReduceMean" axes="[-1]">
             <input src="embeddings" />
-            <output name="means2" />
+            <output name="meansEmbed" />
         </node>
         <node op="Sub">
             <input src="embeddings" />
-            <input src="means2" />
-            <output name="centered2" />
+            <input src="meansEmbed" />
+            <output name="centeredEmbed" />
         </node>
         <node op="Mul">
-            <input src="centered2" />
-            <input src="centered2" />
-            <output name="squared2" />
+            <input src="centeredEmbed" />
+            <input src="centeredEmbed" />
+            <output name="squaredEmbed" />
         </node>
         <node op="ReduceMean" axes="[-1]">
-            <input src="squared2" />
-            <output name="sigma_squared2" />
+            <input src="squaredEmbed" />
+            <output name="sigma_squaredEmbed" />
         </node>
         <node op="Add">
-            <input src="sigma_squared2" />
+            <input src="sigma_squaredEmbed" />
             <input src="ln_eps" />
-            <output name="stable2" />
+            <output name="stableEmbed" />
         </node>
         <node op="Sqrt">
-            <input src="stable2" />
-            <output name="sigma2" />
+            <input src="stableEmbed" />
+            <output name="sigmaEmbed" />
         </node>
         <node op="Div">
-            <params name="gain2" dim="[1, var(dmodel)]" init="ones" />
-            <input src="sigma2" />
-            <output name="gains2" />
+            <params name="gainEmbed" dim="[1, var(dmodel)]" init="ones" />
+            <input src="sigmaEmbed" />
+            <output name="gainEmbed" />
         </node>
         <node op="Mul">
-            <input src="centered2" />
-            <input src="gains2" />
-            <output name="gained2" />
+            <input src="centeredEmbed" />
+            <input src="gainEmbed" />
+            <output name="gainedEmbed" />
         </node>
         <node op="Add">
-            <input src="gained2" />
-            <params dim="[1, var(dmodel)]" name="biases2" init="zeros" />
+            <input src="gainedEmbed" />
+            <params dim="[1, var(dmodel)]" name="biasesEmbed" init="zeros" />
             <output name="layer_norm_embed" />
         </node>
         <export from="layer_norm_embed" />
