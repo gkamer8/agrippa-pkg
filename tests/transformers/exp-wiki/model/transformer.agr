@@ -10,19 +10,11 @@
     <import from="embed_scale" dim="[1]" />
     <import from="ln_eps" dim="[1]" />
 
-    <block title="GrownEmbed">
-        <import from="embed_scale" />
+    <block title="EmbedPlaceholder">
         <node op="Identity">
-            <params name="EmbedW" dim="[var(nvocab), var(dmodel)]" init="normal" init_args="[0, 0.02]" />
+            <params name="EmbedW" dim="[var(nvocab), var(dmodel)]" />
             <output name="Embed" />
         </node>
-        <!-- Originally this node was "Mul", but now experimenting with removing the growth  -->
-        <node op="Identity">
-            <input src="Embed" dim="[var(nvocab), var(dmodel)]" />
-            <!-- <input src="embed_scale" /> -->
-            <output name="EmbedGrown" />
-        </node>
-        <export from="EmbedGrown" />
         <export from="Embed" />
     </block>
 
@@ -31,17 +23,64 @@
         <import from="tokens" />
         <node op="MatMul" title="EmbedProjection">
             <input src="tokens" />
-            <input src="EmbedGrown" />
+            <input src="Embed" />
             <output name="embeddings" />
         </node>
         <export from="embeddings" dim="[var(ntokens), var(dmodel)]" />
     </block>
 
-    <block title="PositionalEmbedding">
+    <block title="EmbedLayerNorm">
         <import from="embeddings" />
+        <node op="ReduceMean" axes="[-1]">
+            <input src="embeddings" />
+            <output name="means2" />
+        </node>
+        <node op="Sub">
+            <input src="embeddings" />
+            <input src="means2" />
+            <output name="centered2" />
+        </node>
+        <node op="Mul">
+            <input src="centered2" />
+            <input src="centered2" />
+            <output name="squared2" />
+        </node>
+        <node op="ReduceMean" axes="[-1]">
+            <input src="squared2" />
+            <output name="sigma_squared2" />
+        </node>
+        <node op="Add">
+            <input src="sigma_squared2" />
+            <input src="ln_eps" />
+            <output name="stable2" />
+        </node>
+        <node op="Sqrt">
+            <input src="stable2" />
+            <output name="sigma2" />
+        </node>
+        <node op="Div">
+            <params name="gain2" dim="[1, var(dmodel)]" init="ones" />
+            <input src="sigma2" />
+            <output name="gains2" />
+        </node>
+        <node op="Mul">
+            <input src="centered2" />
+            <input src="gains2" />
+            <output name="gained2" />
+        </node>
+        <node op="Add">
+            <input src="gained2" />
+            <params dim="[1, var(dmodel)]" name="biases2" init="zeros" />
+            <output name="layer_norm_embed" />
+        </node>
+        <export from="layer_norm_embed" />
+    </block>
+
+    <block title="PositionalEmbedding">
+        <import from="layer_norm_embed" />
         <import from="posembedmatrix" />
         <node op="Add">
-            <input src="embeddings" />
+            <input src="layer_norm_embed" />
             <input src="posembedmatrix" />
             <output name="posembeddings" />
         </node>

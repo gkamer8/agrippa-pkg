@@ -111,7 +111,7 @@ warmup_steps = 2000
 
 start_buffer = 0
 
-nepochs = 2
+nepochs = 3
 
 save_batch_freq = 200
 
