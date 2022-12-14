@@ -8,9 +8,10 @@ import torch
 import math
 import pickle
 import numpy as np
+import os
 
 proj_folder = "model"
-onnx_fname = "decoder.onnx"
+onnx_fname = "test-decoder.onnx"
 
 #txt = """The die is cast; I have consented to return if we are not destroyed.
 #Thus are my hopes blasted by cowardice and"""
@@ -93,10 +94,24 @@ print("Second STR:")
 print(my_str)
 
 print("SAMPLING with prompt:")
-prompt = "The die is"
+prompt = "Despite various publications of results where hand-washing reduced mortality to below 1%, Semmelweis's observations conflicted with the established"
 print(prompt)
 print()
 prompt_ids = tokenizer(prompt)['input_ids']
+
+extended_data = torch.tensor(prompt_ids + [bos_token for _ in range(seq_length-len(prompt_ids))])
+ext_one_hot = F.one_hot(extended_data, num_classes=50257).float()
+outputs = torch_model(ext_one_hot, mask, scale, posembeddingmatrix, embed_scale, ln_eps)
+topk = torch.topk(outputs[0], k=20, dim=1)[1]
+tops = topk[:, 0].flatten()
+y = tokenizer.convert_ids_to_tokens(list(tops))
+my_str = tokenizer.convert_tokens_to_string(y)
+print("Tops before sampling:")
+print(my_str)
+print()
+print("Last token:")
+print(tokenizer.convert_tokens_to_string([y[-1]]))
+print()
 
 temperature = 1
 generation = torch.tensor(prompt_ids + [bos_token for _ in range(seq_length-len(prompt_ids))])
@@ -115,3 +130,34 @@ for i in range(len(prompt_ids), seq_length):
 all_tokens = tokenizer.convert_ids_to_tokens(generation)
 my_str = tokenizer.convert_tokens_to_string(all_tokens)
 print(my_str)
+
+# Get a few random samples
+print()
+print("Arbitrary data examples...")
+
+data_path = os.path.join("dataset", "batches")
+batches = os.listdir(data_path)
+with open(os.path.join(data_path, batches[0]), 'rb') as fhand:
+    x = pickle.load(fhand)
+    ex = x[0]
+    tokens = tokenizer.convert_ids_to_tokens(ex)
+    my_str = tokenizer.convert_tokens_to_string(tokens)
+    print(my_str)
+
+print()
+print("Second example...")
+with open(os.path.join(data_path, batches[1]), 'rb') as fhand:
+    x = pickle.load(fhand)
+    ex = x[0]
+    tokens = tokenizer.convert_ids_to_tokens(ex)
+    my_str = tokenizer.convert_tokens_to_string(tokens)
+    print(my_str)
+
+    print()
+    print("Third example...")
+
+    ex2 = x[1]
+    tokens = tokenizer.convert_ids_to_tokens(ex2)
+    my_str = tokenizer.convert_tokens_to_string(tokens)
+    print(my_str)
+    

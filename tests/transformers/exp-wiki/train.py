@@ -11,14 +11,10 @@ import random
 import math
 import torch
 import matplotlib.pyplot as plt
-import data as my_data
 import torch.nn.functional as F
 
-batch_size = 2
+batch_size = 200
 seq_length = 64
-
-my_data.chunkify("dataset", "chunks", seq_length)
-my_data.batchify('dataset', 'batches', batch_size, 'chunks')
 
 proj_folder = "model"
 onnx_fname = "decoder.onnx"
@@ -47,13 +43,14 @@ device = "cuda:0"
 torch_model = agrippa.onnx_to_torch(onnx_fname)
 torch_model = torch_model.to(device)
 
-nbatches = my_data.get_n_batches(os.path.join('dataset', 'batches', 'meta.json'))
+nbatches = len(os.listdir(os.path.join('dataset', 'batches')))
 batch_order = [i for i in range(nbatches)]
 np.random.shuffle(batch_order)
 bos_token = 50256
 def gen_data_tokens_pair():
+    np.random.shuffle(batch_order)
     for i in range(len(batch_order)):
-        with open(os.path.join('dataset', 'batches', f'{i}.pkl'), 'rb') as fhand:
+        with open(os.path.join('dataset', 'batches', f'{batch_order[i]}.pkl'), 'rb') as fhand:
             prospect = pickle.load(fhand)
         if len(prospect) != batch_size:
             continue
@@ -106,16 +103,17 @@ optimizer = torch.optim.Adam(torch_model.parameters(), lr=current_lr, betas=(0.9
 
 accum_loss = 0
 
-max_train_size = 5
+max_train_size = 100_000  # total for an epoch
 
-gradient_accum_steps = 1
+gradient_accum_steps = 5
 
-warmup_steps = 100
+warmup_steps = 2000
 
 start_buffer = 0
 
-nepochs = 1
-train_size = max_train_size
+nepochs = 2
+
+save_batch_freq = 200
 
 def save_model():
     weights_dict = {}
@@ -139,8 +137,9 @@ for epoch in range(nepochs):
 
         # LR With warmup
         new_lr = bindings['dmodel'] ** (-.5) * min(optim_steps**(-0.5), optim_steps*warmup_steps**(-1.5))
-        optimizer = torch.optim.Adam(torch_model.parameters(), lr=new_lr, betas=(0.9, 0.98), eps=1e-09)
-
+        for g in optimizer.param_groups:
+            g['lr'] = new_lr
+        
         # Add dimension to data
         data = F.one_hot(data).float()
 
@@ -164,15 +163,18 @@ for epoch in range(nepochs):
             accum_loss = 0
             optim_steps += 1
 
+        if counter % save_batch_freq == 0:
+            print("Saving model...")
+            save_model()
+            print(f"Latest lr: {new_lr}")
+            print("Saving logs...")
+            save_log_path = os.path.join("logs", f"log_{optim_steps}.txt")
+            with open(save_log_path, 'w') as fhand:
+                fhand.write(str(loss_log))
+
         counter += 1
         if counter >= max_train_size:
             break
-    if counter < train_size:
-        train_size = counter
-    print("Saving model...")
-    save_model()
-    print(f"Latest lr: {new_lr}")
-    
 
 save_model()
 print(loss_log[-1])
