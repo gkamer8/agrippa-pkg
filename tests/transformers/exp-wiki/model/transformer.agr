@@ -19,7 +19,7 @@
         <!-- Originally this node was "Mul", but now experimenting with removing the growth  -->
         <node op="Identity">
             <input src="Embed" dim="[var(nvocab), var(dmodel)]" />
-            <input src="embed_scale" />
+            <!-- <input src="embed_scale" /> -->
             <output name="EmbedGrown" />
         </node>
         <export from="EmbedGrown" />
