@@ -29,17 +29,17 @@ seq_length = len(tokens)
 bindings = {
     'ntokens': seq_length,
     'nvocab': 50257,
-    'dmodel': 512,
-    'dffnhidden': 2048,
+    'dmodel': 1024,
+    'dffnhidden': 4096,
     'dvalues': 64,
     'dqueries': 64,
     'dkeys': 64,
-    'nheads': 8,
+    'nheads': 16,
     'nlayers': 6
 }
 
 # Convert xml to onnx
-agrippa.export(proj_folder, onnx_fname, bindings=bindings, reinit=False, suppress=True)
+agrippa.export(proj_folder, onnx_fname, bindings=bindings, reinit=False, suppress=False)
 
 torch_model = agrippa.onnx_to_torch(onnx_fname)
 
@@ -81,55 +81,73 @@ y = tokenizer.convert_ids_to_tokens(list(tops))
 print("Target:")
 print(txt)
 
-my_str = tokenizer.convert_tokens_to_string(y)
-print("First STR:")
-print(my_str)
+print("(target) | (prediction1)")
+print()
+for i in range(len(outputs[0])):
+    tar = tokenizer.convert_ids_to_tokens([tokens[i]])
+    tar = tokenizer.convert_tokens_to_string(tar)
+    pred = tops[i]
+    pred = tokenizer.convert_ids_to_tokens([pred])
+    pred = tokenizer.convert_tokens_to_string(pred)
+    print(f"({tar}) | ({pred})")
+
+print()
+print("(target) | (prediction2)")
+print()
 
 tops = topk[:, 1].flatten()
+for i in range(len(outputs[0])):
+    tar = tokenizer.convert_ids_to_tokens([tokens[i]])
+    tar = tokenizer.convert_tokens_to_string(tar)
+    pred = tops[i]
+    pred = tokenizer.convert_ids_to_tokens([pred])
+    pred = tokenizer.convert_tokens_to_string(pred)
+    print(f"({tar}) | ({pred})")
 
-y = tokenizer.convert_ids_to_tokens(list(tops))
-
-my_str = tokenizer.convert_tokens_to_string(y)
-print("Second STR:")
-print(my_str)
+print()
 
 print("SAMPLING with prompt:")
-prompt = "Despite various publications of results where hand-washing reduced mortality to below 1%, Semmelweis's observations conflicted with the established"
+prompt = "Abraham Lincoln was an American lawyer, politician, and"
 print(prompt)
 print()
 prompt_ids = tokenizer(prompt)['input_ids']
 
-extended_data = torch.tensor(prompt_ids + [bos_token for _ in range(seq_length-len(prompt_ids))])
-ext_one_hot = F.one_hot(extended_data, num_classes=50257).float()
-outputs = torch_model(ext_one_hot, mask, scale, posembeddingmatrix, embed_scale, ln_eps)
-topk = torch.topk(outputs[0], k=20, dim=1)[1]
-tops = topk[:, 0].flatten()
-y = tokenizer.convert_ids_to_tokens(list(tops))
-my_str = tokenizer.convert_tokens_to_string(y)
-print("Tops before sampling:")
-print(my_str)
-print()
-print("Last token:")
-print(tokenizer.convert_tokens_to_string([y[-1]]))
-print()
 
-temperature = 1
+# Top k sampling!
+k = 5
+
+presence_penalty = 2
+
+print("Sampling:")
+
+temperature = 1.5
 generation = torch.tensor(prompt_ids + [bos_token for _ in range(seq_length-len(prompt_ids))])
-token_list = [i for i in range(bindings['nvocab'])]
-for i in range(len(prompt_ids), seq_length):
+for i in range(len(prompt_ids)-1, seq_length-1):
     data = F.one_hot(generation, num_classes=50257).float()
     outputs = torch_model(data, mask, scale, posembeddingmatrix, embed_scale, ln_eps)
-    linears = outputs[1][i]
+
+    # Apply presence penalty
+    for id in generation:
+        outputs[1][i][id] /= presence_penalty
+
+    sorted_logits, sorted_indices = torch.sort(outputs[1][i], descending=True)
+
+
+    linears = sorted_logits[:k]
+
+    # linears = outputs[1][i]
     linears /= temperature
     maxed = F.softmax(linears, dim=0)
-    chosen = np.random.choice(token_list, p=maxed.detach().numpy())
-    generation[i] = chosen
-    chosen_token = tokenizer.convert_ids_to_tokens([chosen])
-    my_str = tokenizer.convert_tokens_to_string(chosen_token)
+
+    chosen = np.random.choice(sorted_indices[:k], p=maxed.detach().numpy())
+    # chosen = np.random.choice(sorted_indices[:k])  # uniform among top k
+    generation[i+1] = chosen
 
 all_tokens = tokenizer.convert_ids_to_tokens(generation)
 my_str = tokenizer.convert_tokens_to_string(all_tokens)
 print(my_str)
+
+exit(0)
 
 # Get a few random samples
 print()

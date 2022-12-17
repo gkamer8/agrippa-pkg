@@ -447,7 +447,8 @@ def export(
                 try:
                     kwargs["keepdims"] = _resolve_attr(node.attrib['keepdims'], bindings, expect_value=True)
                 except KeyError:
-                    _notify("No keepdims attr selected for ReduceMean; default=1.")
+                    # Default is 1 (used to be a notify - don't put a notify here, it's jank)
+                    pass
                 inputs = splice_inputs(inputs, params, param_precedence)
                 if len(inputs) > 1:
                     raise SyntaxWarning(f"Softmax should only have one input, yet it has {len(inputs)}")

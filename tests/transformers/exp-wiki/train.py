@@ -17,7 +17,7 @@ batch_size = 200
 seq_length = 64
 
 # To make things easier when we need to use a smaller batch
-effective_batch_size = batch_size // 4
+effective_batch_size = batch_size // 2
 
 proj_folder = "model"
 onnx_fname = "decoder.onnx"
@@ -77,8 +77,6 @@ def gen_data_tokens_pair():
             y_real = y[piece*effective_batch_size:(piece+1)*effective_batch_size]
             y_real = y_real.to(device)
 
-            print("Effectively:")
-            print(len(x_real))
             yield x_real, y_real
 
 scale = math.sqrt(bindings['dkeys'])
@@ -147,7 +145,7 @@ for epoch in range(nepochs):
             print(f"At step {i}")
 
         # LR With warmup
-        new_lr = bindings['dmodel'] ** (-.5) * min(optim_steps**(-0.5), optim_steps*warmup_steps**(-1.5))
+        new_lr = bindings['dmodel'] ** (-.5) * min((start_buffer+optim_steps)**(-0.5), (start_buffer+optim_steps)*warmup_steps**(-1.5))
         for g in optimizer.param_groups:
             g['lr'] = new_lr
         
