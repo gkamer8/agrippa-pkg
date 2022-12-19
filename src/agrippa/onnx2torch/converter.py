@@ -31,7 +31,10 @@ class InitializersContainer(nn.Module):
 
     def add_initializer(self, name: str, initializer: torch.Tensor) -> None:  # pylint: disable=missing-docstring
         param = torch.nn.parameter.Parameter(initializer)
-        self.register_parameter(name, param)
+        if name.find("$constant") != -1:
+            self.register_buffer(name, initializer)
+        else:
+            self.register_parameter(name, param)
         # self.register_buffer(name, initializer)
 
     def forward(self, *args, **kwargs):  # pylint: disable=missing-function-docstring
