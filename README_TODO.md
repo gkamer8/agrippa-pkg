@@ -3,10 +3,6 @@
 A list of what's being worked on and what needs to be done.
 
 ## Documentation
-- Give details on every onnx command - note changed behavior of transpose operation w.r.t. pytorch batching
-- Document expressions in attributes
-- Concat operator
-- frozen="yes", init=constant
 
 ## Implementation
 
