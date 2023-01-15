@@ -1,0 +1,30 @@
+<model script-version="0.0.1">
+    <import dim="[var(n), 1]" from="half1$input" type="float32" />
+
+    <block src="sources/half1.agr" name="half1" />
+
+    <block title="ReluNetwork">
+        <import from="half1$relu" />
+        <block title="FFN Layer" rep="5">
+            <import from="half1$relu" />
+            <node title="Linear" op="MatMul">
+                <params dim="[var(n), var(n)]" name="W" type="float32" shared="no" />
+                <input dim="[var(n), 1]" src="half1$relu" />
+                <output dim="[var(n), 1]" name="linear" />
+            </node>
+            <node title="Bias" op="Add">
+                <params dim="[var(n), 1]" name="B" type="float32" shared="no" />
+                <input dim="[var(n), 1]" src="linear" />
+                <output dim="[var(n), 1]" name="biased" />
+            </node>
+            <node title="LeakyReLU" op="LeakyRelu" alpha="0.1">
+                <input dim="[var(n), 1]" src="biased" />
+                <output dim="[var(n), 1]" name="leaky_relu" />
+            </node>
+            <export from="leaky_relu" />
+        </block>
+        <export from="leaky_relu" />
+    </block>
+
+    <export dim="[var(n), 1]" from="leaky_relu" type="float32" />
+</model>

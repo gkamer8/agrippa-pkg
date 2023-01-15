@@ -176,7 +176,8 @@ def export(
         write_weights=True,
         suppress=False,
         reinit=False,
-        bindings=None
+        bindings=None,
+        index=None  # Main file that things are imported into
     ):
 
     global suppress_prints
@@ -184,13 +185,16 @@ def export(
 
     proj_dir = os.listdir(infile)
     arch_file = None
-    for fil in proj_dir:
-        try:
-            if fil[-4:] == ".xml" or fil[-4:] == ".agr":
-                arch_file = fil
-                break
-        except:
-            pass 
+    if index is None:
+        for fil in proj_dir:
+            try:
+                if fil[-4:] == ".xml" or fil[-4:] == ".agr":
+                    arch_file = fil
+                    break
+            except:
+                pass
+    else:
+        arch_file = index
 
     if not arch_file:
         raise FileNotFoundError("No model architecture file found. A file with .agr or .xml extension expected.")
@@ -292,6 +296,11 @@ def export(
         block_id_tracker['curr'] += 1
         return block_id_tracker['curr']
 
+    def make_imported_name(name, imp_name):
+        if imp_name is not None:
+            return imp_name + "$" + name
+        return name
+
     # the reason why we made those block ids
     saved_import_names = {}  # block id -> dict of names to restore
 
@@ -301,7 +310,8 @@ def export(
 
     # How many programming sins can we commit in the shortest amount of code?
     # A hellish mix of state and functional programming.
-    def parse_block(block, block_id, rep_index=0, stretch_index=0):
+    # "imp_name" means import name = i.e., name needed to resolve names in another file
+    def parse_block(block, block_id, imp_name=None, rep_index=0, stretch_index=0):
 
         # Go through each child of the block
         # Could be block or node
@@ -309,7 +319,7 @@ def export(
 
             # Processing children in correct order w.r.t. nodes so that topological sort works
             if node.tag == 'block':
-                parse_block(node, make_unique_block_id())
+                parse_block(node, make_unique_block_id(), imp_name=imp_name)
                 continue
             elif node.tag != 'node':
                 continue
@@ -324,16 +334,19 @@ def export(
                 title = _resolve_attr(node.attrib['title'], bindings, expect_value=False)
             except KeyError:
                 title = "GenericNode"  # node title is optional
+            title = make_imported_name(title, imp_name)
             title = get_unique_node_name(title)
             
             # Get inputs and outputs
             input_els = node.findall("input")
             naive_inputs = [_resolve_attr(el.attrib['src'], bindings, expect_value=False) for el in input_els]
-            inputs = [name_resolves[x] if x in name_resolves else x for x in naive_inputs]
+            inputs = [make_imported_name(x, imp_name) for x in naive_inputs]  # change name if file is from other source
+            inputs = [name_resolves[x] if x in name_resolves else x for x in inputs]
 
             output_els = node.findall("output")
             naive_outputs = [_resolve_attr(el.attrib['name'], bindings, expect_value=False) for el in output_els]
-            outputs = [name_resolves[x] if x in name_resolves else x for x in naive_outputs]
+            outputs = [make_imported_name(x, imp_name) for x in naive_outputs]  # change name if file is from other source
+            outputs = [name_resolves[x] if x in name_resolves else x for x in outputs]
 
             # Make the parameters
             params = []
@@ -353,7 +366,10 @@ def export(
                 # Note: order can be important!
                 # Each op type specifies the order in which inputs are meant to be included
                 orig_name = _resolve_attr(param.attrib['name'], bindings, expect_value=False)
+                if imp_name is not None:
+                    orig_name = make_imported_name(orig_name, imp_name)
                 name = orig_name
+
                 try:
                     shared = _resolve_attr(param.attrib['shared'], bindings, expect_value=False)
                 except:
@@ -466,6 +482,12 @@ def export(
                     kwargs["axis"] = _resolve_attr(node.attrib['axis'], bindings, expect_value=True)
                 except KeyError:
                     raise SyntaxError(f"Expecting attribute 'axis' for Concat node")
+            elif op == "LeakyRelu":
+                inputs = splice_inputs(inputs, params, param_precedence)
+                try:
+                    kwargs["alpha"] = _resolve_attr(node.attrib['alpha'], bindings, expect_value=True)
+                except KeyError:
+                    raise SyntaxError(f"Expecting attribute 'alpha' for LeakyRelu node")
             new_node = onnx.helper.make_node(
                 name=title,
                 op_type=op,
@@ -503,6 +525,8 @@ def export(
             # save the export resolves
             for exp in block.findall('export'):
                 name = _resolve_attr(exp.attrib['from'], bindings, expect_value=False)
+                if imp_name is not None:
+                    name = make_imported_name(name, imp_name)
                 if block_id in saved_to_concat_exports:
                     try:
                         saved_to_concat_exports[block_id][name].append(name_resolves[name])
@@ -520,10 +544,12 @@ def export(
                 for node in block.iter('node'):
                     for out_el in node.findall("output"):
                         name = _resolve_attr(out_el.attrib['name'], bindings, expect_value=False)
+                        if imp_name is not None:
+                            name = make_imported_name(name, imp_name)
                         uni = get_unique_name(name)
                         name_resolves[name] = uni  # for next rep
                 stretch_index += 1
-                parse_block(block, block_id, rep_index=rep_index, stretch_index=stretch_index)
+                parse_block(block, block_id, imp_name=imp_name, rep_index=rep_index, stretch_index=stretch_index)
             else:
                 # Create concat nodes
                 for orig_name in saved_to_concat_exports[block_id]:                
@@ -532,7 +558,7 @@ def export(
                     new_name = get_unique_name(new_name)
                     kwargs = {"axis": -1}  # will probably have to change, or provide options
                     concat_node = onnx.helper.make_node(
-                        name=get_unique_node_name("stretch_concat"),
+                        name=make_imported_name(get_unique_node_name("stretch_concat"), imp_name),
                         op_type="Concat",
                         inputs=concat_inputs,
                         outputs=[new_name],
@@ -562,6 +588,8 @@ def export(
             saved_import_names[block_id] = {}
             for imp in block.findall('import'):
                 name = imp.attrib['from']
+                if imp_name is not None:
+                    name = make_imported_name(name, imp_name)
                 try:
                     saved_import_names[block_id][name] = name_resolves[name]
                 except KeyError:
@@ -572,29 +600,34 @@ def export(
             curr_exports = []
             # Find the current exports so that we can import them next time
             for exp in block.findall('export'):
-                if _resolve_attr(exp.attrib['from'], bindings, expect_value=False) in name_resolves:
-                    curr_exports.append(name_resolves[_resolve_attr(exp.attrib['from'], bindings, expect_value=False)])
+                bad_name = _resolve_attr(exp.attrib['from'], bindings, expect_value=False)
+                good_name = make_imported_name(bad_name, imp_name)
+                if good_name in name_resolves:
+                    curr_exports.append(name_resolves[good_name])
                 else:
-                    curr_exports.append(exp.attrib['from'])
+                    curr_exports.append(make_imported_name(exp.attrib['from'], imp_name))
 
             # change the intermediate node resolves as though they were exports
             # this is OK I think; treating exports separately is still good to line up rep imports/exports
             # Note that iter gets nested children as well
             for node in block.iter('node'):
                 for out_el in node.findall("output"):
-                    name = _resolve_attr(out_el.attrib['name'], bindings, expect_value=False)
-                    uni = get_unique_name(name)
-                    name_resolves[name] = uni  # for next rep
+                    bad_name = _resolve_attr(out_el.attrib['name'], bindings, expect_value=False)
+                    good_name = make_imported_name(bad_name, imp_name)
+                    uni = get_unique_name(good_name)
+                    name_resolves[good_name] = uni  # for next rep
             
             # Order matters!
             # change the import resolves
             for i, imp in enumerate(block.findall('import')):
                 try:
-                    name_resolves[_resolve_attr(imp.attrib['from'], bindings, expect_value=False)] = curr_exports[i]
+                    bad_name = _resolve_attr(imp.attrib['from'], bindings, expect_value=False)
+                    good_name = make_imported_name(bad_name, imp_name)
+                    name_resolves[good_name] = curr_exports[i]
                 except IndexError:  # it's ok if some imports come from somewhere else and aren't repeated (they must be the last ones)
                     break
 
-            parse_block(block, block_id, rep_index=rep_index)
+            parse_block(block, block_id, imp_name=imp_name, rep_index=rep_index)
         else:
             # Restore import name resolves and leave
             for name in saved_import_names[block_id]:
@@ -603,7 +636,20 @@ def export(
 
     # Go through each block (does this recursively)
     for block in root.findall('block'):
-        parse_block(block, make_unique_block_id())
+        # Is block imported?
+        if 'src' in block.attrib:
+            try:
+                imp_name = block.attrib['name']
+            except KeyError:
+                raise SyntaxError(f"An imported block ({block.attrib['src']}) is missing 'name' attribute")
+
+            print(block.attrib['src'])
+            # Go out and find this jawns
+            imp_tree = ET.parse(os.path.join(infile, block.attrib['src']))  # should throw error if not well-formed XML
+            imp_block = imp_tree.getroot()
+            parse_block(imp_block, make_unique_block_id(), imp_name=imp_name)
+        else:
+            parse_block(block, make_unique_block_id())
 
     # Root model exports - their names might have changed!
     for child in root.findall("export"):
