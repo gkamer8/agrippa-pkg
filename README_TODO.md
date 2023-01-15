@@ -4,7 +4,7 @@ A list of what's being worked on and what needs to be done.
 
 ## Documentation
 - LeakyRelu operator
-- Importing from other files
+- Importing from other files using `<block src=>`
 
 ## Implementation
 
@@ -15,11 +15,9 @@ A list of what's being worked on and what needs to be done.
 
 ### Major
 - Figure out batching in ONNX
-- "stretch" attribute for multi headed attention
 - Clean up parse code, namespace situation
 - Better XML parse errors
 - Better error handling w.r.t. shape problems
-- Allow for defining constants as well as parameters
 
 ## Testing
 
