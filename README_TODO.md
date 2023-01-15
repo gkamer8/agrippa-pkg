@@ -3,9 +3,6 @@
 A list of what's being worked on and what needs to be done.
 
 ## Documentation
-- Give details on every onnx command - note changed behavior of transpose operation w.r.t. pytorch batching
-- Document expressions in attributes
-- Concat operator
 - LeakyRelu operator
 - Importing from other files
 
@@ -23,13 +20,11 @@ A list of what's being worked on and what needs to be done.
 - Better XML parse errors
 - Better error handling w.r.t. shape problems
 - Allow for defining constants as well as parameters
-- Define parameter as frozen/constant, and provide frozen/constant value (+ make weight naming/file transparent) + will probably have to make a bindings file
 
 ## Testing
 
 ### Examples
-- Transformer decoder - delineate d_key, d_query, d_value
-- Use expression to determine weight 
+- Use constant/frozen features to simplify transformer
 
 ### Unit tests
 - More thorough testing of expr (empty expressions, unbound variables, etc.)

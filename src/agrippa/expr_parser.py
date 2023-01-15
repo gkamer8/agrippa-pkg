@@ -80,9 +80,15 @@ def _infix_to_prefix(infix):
  
         tmp = [op] + [op2] + [op1]
         operands.append(tmp)
+
     return operands[-1]
 
 def _eval(toks):
+
+    # Sometimes this function gets a singleton expression (string)
+    if type(toks) != type([]):
+        return json.loads(toks)
+
     toks = toks[::-1]
     stack = []
     for tok in toks:
@@ -112,8 +118,9 @@ def parse_expr(text, bindings={}):
         raise SyntaxWarning("Parentheses not supported; ignoring.")
 
     tokens = _tokenize(text, bindings)
-    
+
     prefixed = _infix_to_prefix(tokens)
+
     evaluated = _eval(prefixed)
 
     return evaluated

@@ -1,0 +1,24 @@
+<model script-version="0.0.1">
+
+    <import dim="[3, 1]" from="input" type="float32" />
+
+    <block title="Multiply">
+        <node op="Mul">
+            <params name="Constant" frozen="yes" dim="[3, 1]" init="constant" init_args="[expr(val)]" />
+            <input src="input" />
+            <output name="y" />
+        </node>
+    </block>
+
+    <block title="Multiply">
+        <node op="Mul">
+            <params name="NotConstant" frozen="no" dim="[3, 1]" init="constant" init_args="[expr(val)]" />
+            <input src="y" />
+            <output name="y2" />
+        </node>
+    </block>
+
+    <export dim="[3, 1]" from="y" type="float32" />
+    <export dim="[3, 1]" from="y2" type="float32" />
+
+</model>

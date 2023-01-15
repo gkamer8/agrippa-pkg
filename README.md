@@ -94,6 +94,15 @@ Blocks may take a `rep` attribute, which defines how many times a block should b
 
 The `agrippa.export` function takes an optional argument, `bindings`. The `bindings` parameter is meant to be a dictionary of variables, set by the user, to replace areas in the markup file where the `var` function is used. For example, if an input tag has a `dim` attribute set to `"[var(image_width), var(image_height)]"`, a binding of `{'image_width': 512, 'image_height': '256'}` would set all occurances of `var(image_height)` to `512` and all occurances of `var(image_height)` to `256`. Note that in all cases, strings are used, since xml attributes require strings; the values are type-casted upon compilation.
 
+## Expressions
+
+Attributes also support expressions using `expr()`. For example, in order to specify that a parameter should be initialized to the square of a variable (supplied in bindings), you could use:
+`<params name="squared" dim="[2, 2]" init="constant" init_args="[expr(my_var^2)]">`.
+
+Note that the expression goes inside the list (expressions do not support lists). They support to following binary operators: `^`, `*`, `/`, `%`, `-`, `+`.
+
+Also note that `expr(my_var)` and `var(my_var)` are equivalent.
+
 ## Weight Initialization
 
 By default, weights are initialized with a standard normal distribution. There are ways to specify other initializations for each parameter, however. The `params` tag takes an optional `init` attribute along with an optional `init_args` attribute. The `init_args` attribute must always be some value (non-string), such as a list (e.g., `init_args="[2, 3]"`). Recall that all attributes are specified with double quotation marks) The options for initialization are:
@@ -104,6 +113,11 @@ By default, weights are initialized with a standard normal distribution. There a
 | uni_random  | Uniformly random in [a, b) | A list of two numbers, the first defining the a and the second defining b.|
 | zeros | All zeros | None |
 | ones  | All ones  | None |
+| constant | Initializes tensor to specified value | The first argument in the list is the value
+
+## Frozen Parameters
+
+In order to freeze a parameter, you can set the `frozen` attribute equal to `yes`. Internally, this option adds `$constant` to the ONNX initialization names. When importing the parameter into PyTorch using the conversion tool, the `$constant` indicates that the initializer should be added as a buffer (constant) rather than a parameter.
 
 ## Other Rules
 
@@ -131,9 +145,10 @@ The only currently supported type is `float32`.
 The currently supported op types are:
 
 
-| ONNX OpType | Tested ONNX Compile Support        | Tested Training Support |
-| ----------- | ---------------------------------- |--------------------------|
+| ONNX OpType | Tested ONNX Compile Support        | Tested Training Support           |
+| ----------- | ---------------------------------- |-----------------------------------|
 | Add         | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
+| Concat      | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
 | Identity    | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
 | LpNormalization | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
 | MatMul      | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
@@ -144,6 +159,22 @@ The currently supported op types are:
 | Sqrt        | <span style=color:green>Yes</span> |<span style=color:green>Yes</span>|
 | Sub         | <span style=color:green>Yes</span> |<span style=color:green>Yes</span>|
 | Transpose   | <span style=color:green>Yes</span> |<span style=color:green>Yes</span>|
+
+Notes about their functioning. For other details, see [the Onnx documentation](https://github.com/onnx/onnx/blob/main/docs/Operators.md).
+
+| ONNX OpType | Notes                                |
+| ----------- | -------------------------------------|
+| Add         |                                      |
+| LpNormalization |                                  |
+| MatMul      |                                      |
+| Mul         |                                      |
+| Relu        |                                      |
+| ReduceMean  |                                      |
+| Identity    |                                      |
+| Softmax     |                                      |
+| Sqrt        |                                      |
+| Sub         |                                      |
+| Transpose   | Important difference with the Onnx documentation: by default, when imported into PyTorch, the transpose operator will keep the first dimension the same so as to support batching. The Onnx default behavior is to reverse all the dimensions. |
 
 ## Syntax Highlighting in VSCode
 

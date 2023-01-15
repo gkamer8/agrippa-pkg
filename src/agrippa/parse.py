@@ -139,6 +139,11 @@ def _resolve_param(name, data_type, dims, weights, init_type=DEFAULT_INIT_TYPE, 
         tens = np.ones(dims)
     elif init_type == 'zeros':
         tens = np.zeros(dims)
+    elif init_type == 'constant':
+        if len(init_args) != 1:
+            raise SyntaxError(f"For init type = constant, init args must have exactly one member")
+        val = init_args[0]
+        tens = np.full(dims, val)
     else:
         _notify(f"Weight initialization type '{init_type}' not known; defaulting to N(0, 1)")
         tens = np.random.normal(loc=0., scale=1., size=dims)
@@ -391,6 +396,18 @@ def export(
                     init_args = _resolve_attr(param.attrib['init_args'], bindings, expect_value=True)
                 except:
                     init_args = None
+
+                orig_name = _resolve_attr(param.attrib['name'], bindings, expect_value=False)
+
+                # If the parameter is frozen, add "$constant" to the name
+                try:
+                    frozen = _resolve_attr(param.attrib['frozen'], bindings, expect_value=False)
+                except:
+                    frozen = "no"
+                if frozen == "yes":
+                    orig_name += "$constant"
+
+                name = orig_name
                 
                 if shared == "no":
                     name = get_unique_param_name(orig_name)
