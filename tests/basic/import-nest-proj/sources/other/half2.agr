@@ -1,0 +1,28 @@
+<model script-version="0.0.1">
+    <import dim="[var(n), 1]" from="input" type="float32" />
+
+    <block title="LeakyReluNetwork">
+        <import from="input" />
+        <block title="FFN Layer" rep="2">
+            <import from="input" />
+            <node title="Linear" op="MatMul">
+                <params dim="[var(n), var(n)]" name="W" type="float32" shared="no" />
+                <input dim="[var(n), 1]" src="input" />
+                <output dim="[var(n), 1]" name="linear" />
+            </node>
+            <node title="Bias" op="Add">
+                <params dim="[var(n), 1]" name="B" type="float32" shared="no" />
+                <input dim="[var(n), 1]" src="linear" />
+                <output dim="[var(n), 1]" name="biased" />
+            </node>
+            <node title="LeakyReLU" op="LeakyRelu" alpha="0.1">
+                <input dim="[var(n), 1]" src="biased" />
+                <output dim="[var(n), 1]" name="leaky_relu" />
+            </node>
+            <export from="leaky_relu" />
+        </block>
+        <export from="leaky_relu" />
+    </block>
+
+    <export dim="[var(n), 1]" from="leaky_relu" type="float32" />
+</model>

@@ -165,6 +165,21 @@ def _get_output_model_name(outfile, infile):
     return infile + ".onnx"
 
 
+# Returns true is block is imported
+def _detect_import(block):
+    is_imp = 'src' in block.attrib
+    if is_imp and 'name' not in block.attrib:
+        src = block.attrib['src']
+        raise SyntaxError(f"An imported block {src} is missing 'name' attribute")
+    return is_imp
+
+
+def _find_import(block_src, prefix=None):
+    true_src = block_src if prefix is None else os.path.join(prefix, block_src)
+    imp_tree = ET.parse(true_src)  # should throw error if not well-formed XML
+    imp_block = imp_tree.getroot()
+    return imp_block
+
 """
 def export(infile, ...)
 
@@ -316,7 +331,7 @@ def export(
     # How many programming sins can we commit in the shortest amount of code?
     # A hellish mix of state and functional programming.
     # "imp_name" means import name = i.e., name needed to resolve names in another file
-    def parse_block(block, block_id, imp_name=None, rep_index=0, stretch_index=0):
+    def parse_block(block, block_id, imp_name=None, imp_path=None, rep_index=0, stretch_index=0):
 
         # Go through each child of the block
         # Could be block or node
@@ -324,7 +339,14 @@ def export(
 
             # Processing children in correct order w.r.t. nodes so that topological sort works
             if node.tag == 'block':
-                parse_block(node, make_unique_block_id(), imp_name=imp_name)
+                # If it's imported, need to change imp_name and continue
+                if _detect_import(node):
+                    new_imp_name = make_imported_name(node.attrib['name'], imp_name)
+                    imp_block = _find_import(node.attrib['src'], os.path.join(infile, imp_path))
+                    new_imp_path = os.path.split(os.path.join(imp_path, node.attrib['src']))[0]
+                    parse_block(imp_block, make_unique_block_id(), imp_name=new_imp_name, imp_path=new_imp_path)
+                else:
+                    parse_block(node, make_unique_block_id(), imp_name=imp_name, imp_path=imp_path)
                 continue
             elif node.tag != 'node':
                 continue
@@ -566,7 +588,7 @@ def export(
                         uni = get_unique_name(name)
                         name_resolves[name] = uni  # for next rep
                 stretch_index += 1
-                parse_block(block, block_id, imp_name=imp_name, rep_index=rep_index, stretch_index=stretch_index)
+                parse_block(block, block_id, imp_name=imp_name, rep_index=rep_index, stretch_index=stretch_index, imp_path=imp_path)
             else:
                 # Create concat nodes
                 for orig_name in saved_to_concat_exports[block_id]:                
@@ -644,7 +666,7 @@ def export(
                 except IndexError:  # it's ok if some imports come from somewhere else and aren't repeated (they must be the last ones)
                     break
 
-            parse_block(block, block_id, imp_name=imp_name, rep_index=rep_index)
+            parse_block(block, block_id, imp_name=imp_name, rep_index=rep_index, imp_path=imp_path)
         else:
             # Restore import name resolves and leave
             for name in saved_import_names[block_id]:
@@ -654,17 +676,12 @@ def export(
     # Go through each block (does this recursively)
     for block in root.findall('block'):
         # Is block imported?
-        if 'src' in block.attrib:
-            try:
-                imp_name = block.attrib['name']
-            except KeyError:
-                raise SyntaxError(f"An imported block ({block.attrib['src']}) is missing 'name' attribute")
-
-            print(block.attrib['src'])
+        if _detect_import(block):
+            imp_name = block.attrib['name']
             # Go out and find this jawns
-            imp_tree = ET.parse(os.path.join(infile, block.attrib['src']))  # should throw error if not well-formed XML
-            imp_block = imp_tree.getroot()
-            parse_block(imp_block, make_unique_block_id(), imp_name=imp_name)
+            imp_block = _find_import(block.attrib['src'], infile)
+            imp_path = os.path.split(block.attrib['src'])[0]
+            parse_block(imp_block, make_unique_block_id(), imp_name=imp_name, imp_path=imp_path)
         else:
             parse_block(block, make_unique_block_id())
 

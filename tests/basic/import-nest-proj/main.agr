@@ -1,0 +1,7 @@
+<model script-version="0.0.1">
+    <import dim="[var(n), 1]" from="half1$input" type="float32" />
+
+    <block src="sources/half1.agr" name="half1" />
+
+    <export dim="[var(n), 1]" from="half1$half2$leaky_relu" type="float32" />
+</model>

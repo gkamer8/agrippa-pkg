@@ -5,10 +5,7 @@
 
     <import from="tokens" dim="[var(ntokens), var(nvocab)]" />
     <import from="mask" dim="[var(ntokens), var(ntokens)]" />
-    <import from="scale" dim="[1]" />
     <import from="posembedmatrix" dim="[var(ntokens), var(dmodel)]" />
-    <import from="embed_scale" dim="[1]" />
-    <import from="ln_eps" dim="[1]" />
 
     <block title="EmbedPlaceholder">
         <node op="Identity">
@@ -51,7 +48,7 @@
         </node>
         <node op="Add">
             <input src="sigma_squaredEmbed" />
-            <input src="ln_eps" />
+            <params name="ln_eps" dim="[1]" frozen="yes" init="constant" init_args="[var(ln_eps)]" />
             <output name="stableEmbed" />
         </node>
         <node op="Sqrt">
@@ -90,9 +87,7 @@
     <!-- The big decoder block -->
     <block title="DecoderLayer" rep="var(nlayers)">
         <import from="posembeddings" dim="[var(ntokens), var(dmodel)]" />
-        <import from="scale" />
         <import from="mask" dim="[var(ntokens), var(ntokens)]" />
-	    <import from="ln_eps" />
 
         <block title="LayerNorm">
             <import from="posembeddings" />
@@ -116,7 +111,7 @@
             </node>
             <node op="Add">
                 <input src="sigma_squared" />
-                <input src="ln_eps" />
+                <params name="ln_eps" dim="[1]" frozen="yes" init="constant" init_args="[var(ln_eps)]" />
                 <output name="stable" />
             </node>
             <node op="Sqrt">
@@ -143,7 +138,6 @@
 
         <block title="Attention" stretch="var(nheads)">
             <import from="layer_norm_out" dim="[var(ntokens), var(dmodel)]" />
-            <import from="scale" dim="[var(ntokens), var(ntokens)]" />
             <import from="mask" dim="[var(ntokens), var(ntokens)]" />
             <block title="LinearQKV">
                 <import from="layer_norm_out" />
@@ -167,7 +161,6 @@
                 <export from="values" />
             </block>
             <block title="ScaledDotProductAttention">
-                <import from="scale" dim="[var(ntokens), var(ntokens)]" />
                 <import from="mask" dim="[var(ntokens), var(ntokens)]" />
                 <import from="queries" />
                 <import from="values" />
@@ -183,7 +176,7 @@
                 </node>
                 <node op="Div">
                     <input src="matmul" />
-                    <input src="scale" />
+                    <params name="scale" frozen="yes" dim="[1]" init="constant" init_args="[var(scale)]" />
                     <output name="scaled" />
                 </node>
                 <node title="Mask" op="Add">
@@ -247,7 +240,7 @@
             </node>
             <node op="Add">
                 <input src="sigma_squared2" />
-                <input src="ln_eps" />
+                <params name="ln_eps" dim="[1]" frozen="yes" init="constant" init_args="[var(ln_eps)]" />
                 <output name="stable2" />
             </node>
             <node op="Sqrt">
