@@ -9,7 +9,7 @@ import os
 
 """
 
-Test stretching
+Test importing from other Agrippa file
 
 """
 

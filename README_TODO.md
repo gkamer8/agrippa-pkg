@@ -7,6 +7,7 @@ A list of what's being worked on and what needs to be done.
 - Document expressions in attributes
 - Concat operator
 - LeakyRelu operator
+- Importing from other files
 
 ## Implementation
 
@@ -22,7 +23,6 @@ A list of what's being worked on and what needs to be done.
 - Better XML parse errors
 - Better error handling w.r.t. shape problems
 - Allow for defining constants as well as parameters
-- Create "link" tag to combine different arch files
 - Define parameter as frozen/constant, and provide frozen/constant value (+ make weight naming/file transparent) + will probably have to make a bindings file
 
 ## Testing
