@@ -1,7 +1,11 @@
 <model script-version="0.0.1">
     <import dim="[var(n), 1]" from="half1$input" type="float32" />
 
-    <block src="sources/half1.agr" name="half1" />
+    <block title="TestRep" rep="2">
+        <import from="half1$input" />
+        <block src="sources/half1.agr" name="half1" />
+        <export from="half1$relu" />
+    </block>
 
     <block title="ReluNetwork">
         <import from="half1$relu" />

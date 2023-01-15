@@ -18,66 +18,24 @@
     <!-- Shrinks tokens into dmodel using a learned embedding -->
     <block title="Embedding">
         <import from="tokens" />
-        <node op="MatMul" title="EmbedProjection">
+        <node op="Mul" title="EmbedMul">
             <input src="tokens" />
+            <params dim="[1]" name="embeddings_scale" init="constant" init_args="[var(embed_scale)]" frozen="yes" />
+            <output name="embed_scaled" />
+        </node>
+        <node op="MatMul" title="EmbedProjection">
+            <input src="embed_scaled" />
             <input src="Embed" />
             <output name="embeddings" />
         </node>
         <export from="embeddings" dim="[var(ntokens), var(dmodel)]" />
     </block>
 
-    <block title="EmbedLayerNorm">
-        <import from="embeddings" />
-        <node op="ReduceMean" axes="[-1]">
-            <input src="embeddings" />
-            <output name="meansEmbed" />
-        </node>
-        <node op="Sub">
-            <input src="embeddings" />
-            <input src="meansEmbed" />
-            <output name="centeredEmbed" />
-        </node>
-        <node op="Mul">
-            <input src="centeredEmbed" />
-            <input src="centeredEmbed" />
-            <output name="squaredEmbed" />
-        </node>
-        <node op="ReduceMean" axes="[-1]">
-            <input src="squaredEmbed" />
-            <output name="sigma_squaredEmbed" />
-        </node>
-        <node op="Add">
-            <input src="sigma_squaredEmbed" />
-            <params name="ln_eps" dim="[1]" frozen="yes" init="constant" init_args="[var(ln_eps)]" />
-            <output name="stableEmbed" />
-        </node>
-        <node op="Sqrt">
-            <input src="stableEmbed" />
-            <output name="sigmaEmbed" />
-        </node>
-        <node op="Div">
-            <params name="gainEmbed" dim="[1, var(dmodel)]" init="ones" />
-            <input src="sigmaEmbed" />
-            <output name="gainEmbed" />
-        </node>
-        <node op="Mul">
-            <input src="centeredEmbed" />
-            <input src="gainEmbed" />
-            <output name="gainedEmbed" />
-        </node>
-        <node op="Add">
-            <input src="gainedEmbed" />
-            <params dim="[1, var(dmodel)]" name="biasesEmbed" init="zeros" />
-            <output name="layer_norm_embed" />
-        </node>
-        <export from="layer_norm_embed" />
-    </block>
-
     <block title="PositionalEmbedding">
-        <import from="layer_norm_embed" />
+        <import from="embeddings" />
         <import from="posembedmatrix" />
         <node op="Add">
-            <input src="layer_norm_embed" />
+            <input src="embeddings" />
             <input src="posembedmatrix" />
             <output name="posembeddings" />
         </node>
@@ -87,7 +45,12 @@
     <!-- The big decoder block -->
     <block title="DecoderLayer" rep="var(nlayers)">
         <import from="posembeddings" dim="[var(ntokens), var(dmodel)]" />
-        <import from="mask" dim="[var(ntokens), var(ntokens)]" />
+
+        <node name="LN1_Placeholder" op="Identity">
+            <input src="posembeddings" />
+            <output name="ln1$input" />
+        </node>
+        <block src="layer_norm.agr" name="ln1" />
 
         <block title="LayerNorm">
             <import from="posembeddings" />

@@ -338,12 +338,12 @@ def export(
         for node in block.findall('*'):
 
             # Processing children in correct order w.r.t. nodes so that topological sort works
-            if node.tag == 'block':
+            if node.tag == 'block' or node.tag == 'model':
                 # If it's imported, need to change imp_name and continue
                 if _detect_import(node):
                     new_imp_name = make_imported_name(node.attrib['name'], imp_name)
-                    imp_block = _find_import(node.attrib['src'], os.path.join(infile, imp_path))
-                    new_imp_path = os.path.split(os.path.join(imp_path, node.attrib['src']))[0]
+                    imp_block = _find_import(node.attrib['src'], os.path.join(infile, imp_path) if imp_path is not None else infile)
+                    new_imp_path = os.path.split(os.path.join(imp_path, node.attrib['src']) if imp_path is not None else node.attrib['src'])[0]
                     parse_block(imp_block, make_unique_block_id(), imp_name=new_imp_name, imp_path=new_imp_path)
                 else:
                     parse_block(node, make_unique_block_id(), imp_name=imp_name, imp_path=imp_path)
@@ -644,7 +644,20 @@ def export(
                 if good_name in name_resolves:
                     curr_exports.append(name_resolves[good_name])
                 else:
-                    curr_exports.append(make_imported_name(exp.attrib['from'], imp_name))
+                    curr_exports.append(good_name)
+
+            # Imported blocks need to be treated specially for their intermediate node resolves
+            for bl in block.iter('block'):
+                if _detect_import(bl):
+                    sourced_bl = _find_import(bl.attrib['src'], os.path.join(infile, imp_path) if imp_path is not None else infile)
+                    for node in sourced_bl.iter('*'):
+                        if node.tag != 'node':
+                            continue
+                        for out_el in node.findall("output"):
+                            bad_name = _resolve_attr(out_el.attrib['name'], bindings, expect_value=False)
+                            good_name = make_imported_name(bad_name, bl.attrib['name'])
+                            uni = get_unique_name(good_name)
+                            name_resolves[good_name] = uni  # for next rep
 
             # change the intermediate node resolves as though they were exports
             # this is OK I think; treating exports separately is still good to line up rep imports/exports

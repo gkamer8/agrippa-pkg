@@ -32,6 +32,4 @@ x = np.random.random((bindings['n'], 1)).astype("float32")
 ort_sess = ort.InferenceSession('testing.onnx', providers=['CPUExecutionProvider'])
 outputs = ort_sess.run(None, {'half1$input': x})
 
-print(outputs[0])
-
-print("Test 7 passed")
+print("Test 9 passed")
