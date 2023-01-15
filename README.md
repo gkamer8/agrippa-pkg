@@ -119,6 +119,14 @@ By default, weights are initialized with a standard normal distribution. There a
 
 In order to freeze a parameter, you can set the `frozen` attribute equal to `yes`. Internally, this option adds `$constant` to the ONNX initialization names. When importing the parameter into PyTorch using the conversion tool, the `$constant` indicates that the initializer should be added as a buffer (constant) rather than a parameter.
 
+## Importing From Other Files
+
+Another file can be used in your model by using a `block` tag with a `src` attribute. Like so:
+
+```<block src="path/to/file.agr" name="imported_file" />```
+
+The `name` attribute defines how you refer to imports/exports of the imported model. For example, if the linked model has a root level import with name `inputs`, an output (or import) (in the original file) with name `imported_file$inputs` will be automatically passed to the imported model. Likewise, an export can be referred to in the original file by specifying an input with name `imported_file$out_name_from_imp_file`.
+
 ## Other Rules
 
 ### Names
@@ -150,6 +158,7 @@ The currently supported op types are:
 | Add         | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
 | Concat      | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
 | Identity    | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
+| LeakyRelu   | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
 | LpNormalization | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
 | MatMul      | <span style=color:green>Yes</span> | <span style=color:green>Yes</span>|
 | Mul         | <span style=color:green>Yes</span> |<span style=color:green>Yes</span>|
@@ -160,20 +169,10 @@ The currently supported op types are:
 | Sub         | <span style=color:green>Yes</span> |<span style=color:green>Yes</span>|
 | Transpose   | <span style=color:green>Yes</span> |<span style=color:green>Yes</span>|
 
-Notes about their functioning. For other details, see [the Onnx documentation](https://github.com/onnx/onnx/blob/main/docs/Operators.md).
+Additional notes on functionality that might differ from ONNX. For most details, see [the Onnx documentation](https://github.com/onnx/onnx/blob/main/docs/Operators.md).
 
 | ONNX OpType | Notes                                |
 | ----------- | -------------------------------------|
-| Add         |                                      |
-| LpNormalization |                                  |
-| MatMul      |                                      |
-| Mul         |                                      |
-| Relu        |                                      |
-| ReduceMean  |                                      |
-| Identity    |                                      |
-| Softmax     |                                      |
-| Sqrt        |                                      |
-| Sub         |                                      |
 | Transpose   | Important difference with the Onnx documentation: by default, when imported into PyTorch, the transpose operator will keep the first dimension the same so as to support batching. The Onnx default behavior is to reverse all the dimensions. |
 
 ## Syntax Highlighting in VSCode

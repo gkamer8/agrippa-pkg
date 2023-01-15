@@ -3,14 +3,14 @@
 A list of what's being worked on and what needs to be done.
 
 ## Documentation
-- LeakyRelu operator
-- Importing from other files using `<block src=>`
+- Nothing
 
 ## Implementation
 
 ### Minor
 - Create "default" tag to set default initializations, other things
 - types of initializations and their implementations need to be separated out for maintainability
+- Make sure rep as attribute of imported file block works properly.
 - Aliases for operations (e.g., "relu" for "Relu" - should go with clean ups to parse)
 
 ### Major
