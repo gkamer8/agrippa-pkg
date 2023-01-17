@@ -26,11 +26,11 @@ onnx_fname = "transformer.onnx"
 bindings = {
     'ntokens': seq_length,
     'nvocab': 50257,
-    'dmodel': 1024,
-    'dffnhidden': 4096,
-    'dvalues': 64,
-    'dqueries': 64,
-    'dkeys': 64,
+    'dmodel': 16,  # 1024 in Transformer Big
+    'dffnhidden': 16,  # 4096 in Transformer Big
+    'dvalues': 2,  # 64 in Transformer Big
+    'dqueries': 2,  # 64 in Transformer Big
+    'dkeys': 2,  # 64 in Transformer Big
     'nheads': 3,  # 16 in Transformer Big
     'nlayers': 2,  # 6 in Transformer Big
 }
@@ -44,7 +44,7 @@ constant_bindings = {
 bindings.update(constant_bindings)
 
 # Convert xml to onnx
-agrippa.export(proj_folder, onnx_fname, index="encoder.agr", bindings=bindings, reinit=True, suppress=True)
+agrippa.export(proj_folder, onnx_fname, index="transformer.agr", bindings=bindings, reinit=True, suppress=True)
 
 print("Exported")
 

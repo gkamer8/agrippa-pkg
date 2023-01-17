@@ -655,7 +655,8 @@ def export(
                             continue
                         for out_el in node.findall("output"):
                             bad_name = _resolve_attr(out_el.attrib['name'], bindings, expect_value=False)
-                            good_name = make_imported_name(bad_name, bl.attrib['name'])
+                            # The double make imported name is to carry over the current imp name into the next
+                            good_name = make_imported_name(bad_name, make_imported_name(bl.attrib['name'], imp_name))
                             uni = get_unique_name(good_name)
                             name_resolves[good_name] = uni  # for next rep
 

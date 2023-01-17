@@ -7,6 +7,7 @@
     <import from="mask" dim="[var(ntokens), var(ntokens)]" />
     <import from="posembedmatrix" dim="[var(ntokens), var(dmodel)]" />
     <import from="Embed" dim="[var(nvocab), var(dmodel)]" />
+    <import from="encoder_output" dim="[var(ntokens), var(dmodel)]" />
 
     <!-- Shrinks tokens into dmodel using a learned embedding -->
     <block title="Embedding">
@@ -35,7 +36,7 @@
         <export from="posembeddings" dim="[var(ntokens), var(dmodel)]" />
     </block>
 
-    <!-- The big encoder block -->
+    <!-- The big decoder block -->
     <block title="DecoderLayer" rep="var(nlayers)">
         <import from="posembeddings" dim="[var(ntokens), var(dmodel)]" />
 
@@ -175,8 +176,80 @@
             <export from="attended_added2" />
         </block>
 
-        <export from="attended_added2" />
+        <node name="LN3_Placeholder" op="Identity">
+            <input src="attended_added2" />
+            <output name="ln3$input" />
+        </node>
+        <block src="layer_norm.agr" name="ln3" />
+
+        <!-- Queries come from prev layer, keys and values come from encoder -->
+        <block title="CrossAttention" stretch="var(nheads)">
+            <import from="ln3$layer_norm_out" dim="[var(ntokens), var(dmodel)]" />
+            <block title="LinearQKV">
+                <import from="ln3$layer_norm_out" />
+                <node op="MatMul">
+                    <input src="ln3$layer_norm_out" />
+                    <params name="QueryWeights2" dim="[var(dmodel), var(dqueries)]" />
+                    <output name="queries2" dims="[var(ntokens), var(dqueries)]" />
+                </node>
+                <node op="MatMul">
+                    <input src="encoder_output" />
+                    <params name="KeyWeights2" dim="[var(dmodel), var(dkeys)]" />
+                    <output name="keys2" dims="[var(ntokens), var(dkeys)]" />
+                </node>
+                <node op="MatMul">
+                    <input src="encoder_output" />
+                    <params name="ValueWeights2" dim="[var(dmodel), var(dvalues)]" />
+                    <output name="values2" dim="[var(ntokens), var(dvalues)]" />
+                </node>
+                <export from="queries2" />
+                <export from="keys2" />
+                <export from="values2" />
+            </block>
+            <block title="ScaledDotProductAttention">
+                <import from="queries2" />
+                <import from="values2" />
+                <import from="keys2" />
+                <node op="Transpose">
+                    <input src="keys2" />
+                    <output name="keys_t2" dim="[var(dkeys), var(ntokens)]" />
+                </node>
+                <node op="MatMul">
+                    <input src="queries2" />
+                    <input src="keys_t2" />
+                    <output name="matmul2" dim="[var(ntokens), var(ntokens)]" />
+                </node>
+                <node op="Div">
+                    <input src="matmul2" />
+                    <params name="scale2" frozen="yes" dim="[1]" init="constant" init_args="[var(scale)]" />
+                    <output name="scaled2" />
+                </node>
+                <node op="Softmax" axis="-1">
+                    <input src="scaled2" />
+                    <output name="softmaxed2" />
+                </node>
+                <node op="MatMul" title="ValueMatmul">
+                    <input src="softmaxed2" />
+                    <input src="values2" />
+                    <output name="attended2" dim="[var(ntokens), var(dvalues)]" />
+                </node>
+            </block>            
+            <export from="attended2" />
+        </block>
+
+        <block title="Add2">
+            <import from="attended2" />
+            <import from="attended_added2" />
+            <node op="Add">
+                <input src="attended2" />
+                <input src="attended_added2" />
+                <output name="attended2_added" />
+            </node>
+            <export from="attended2_added" />
+        </block>
+
+        <export from="attended2_added" />
     </block>
 
-    <export from="attended_added2" dim="[var(ntokens), var(dmodel)]" />
+    <export from="attended2_added" dim="[var(ntokens), var(nvocab)]" />
 </model>
