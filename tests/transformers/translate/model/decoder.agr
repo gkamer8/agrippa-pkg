@@ -237,11 +237,21 @@
             <export from="attended2" />
         </block>
 
-        <block title="Add2">
+        <block title="ConcatLinear">
             <import from="attended2" />
+            <node op="MatMul">
+                <input src="attended2" />
+                <params name="LinearConcatW2" dim="[expr(dvalues * nheads), var(dmodel)]" />
+                <output name="linear_concatenated2" />
+            </node>
+            <export from="linear_concatenated2" />
+        </block>
+
+        <block title="Add2">
+            <import from="linear_concatenated2" />
             <import from="attended_added2" />
             <node op="Add">
-                <input src="attended2" />
+                <input src="linear_concatenated2" />
                 <input src="attended_added2" />
                 <output name="attended2_added" />
             </node>
