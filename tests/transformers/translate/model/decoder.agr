@@ -40,29 +40,23 @@
     <block title="DecoderLayer" rep="var(nlayers)">
         <import from="posembeddings" dim="[var(ntokens), var(dmodel)]" />
 
-        <node name="LN1_Placeholder" op="Identity">
-            <input src="posembeddings" />
-            <output name="ln1$input" />
-        </node>
-        <block src="layer_norm.agr" name="ln1" />
-
         <block title="Attention" stretch="var(nheads)">
-            <import from="ln1$layer_norm_out" dim="[var(ntokens), var(dmodel)]" />
+            <import from="posembeddings" dim="[var(ntokens), var(dmodel)]" />
             <import from="mask" dim="[var(ntokens), var(ntokens)]" />
             <block title="LinearQKV">
-                <import from="ln1$layer_norm_out" />
+                <import from="posembeddings" />
                 <node op="MatMul">
-                    <input src="ln1$layer_norm_out" />
+                    <input src="posembeddings" />
                     <params name="QueryWeights" dim="[var(dmodel), var(dqueries)]" />
                     <output name="queries" dims="[var(ntokens), var(dqueries)]" />
                 </node>
                 <node op="MatMul">
-                    <input src="ln1$layer_norm_out" />
+                    <input src="posembeddings" />
                     <params name="KeyWeights" dim="[var(dmodel), var(dkeys)]" />
                     <output name="keys" dims="[var(ntokens), var(dkeys)]" />
                 </node>
                 <node op="MatMul">
-                    <input src="ln1$layer_norm_out" />
+                    <input src="posembeddings" />
                     <params name="ValueWeights" dim="[var(dmodel), var(dvalues)]" />
                     <output name="values" dim="[var(ntokens), var(dvalues)]" />
                 </node>
@@ -128,16 +122,16 @@
             <export from="attended_added" />
         </block>
 
-        <node name="LN2_Placeholder" op="Identity">
+        <node name="LN1_Placeholder" op="Identity">
             <input src="attended_added" />
-            <output name="ln2$input" />
+            <output name="ln1$input" />
         </node>
-        <block src="layer_norm.agr" name="ln2" />
+        <block src="layer_norm.agr" name="ln1" />
 
         <block title="FFN">
-            <import from="ln2$layer_norm_out" />
+            <import from="ln1$layer_norm_out" />
             <node op="MatMul">
-                <input src="ln2$layer_norm_out" />
+                <input src="ln1$layer_norm_out" />
                 <params name="ffn_w" dim="[var(dmodel), var(dffnhidden)]" />
                 <output name="ffn_projected" dim="[var(ntokens), var(dffnhidden)]" />
             </node>
@@ -167,28 +161,29 @@
 
         <block title="Add2">
             <import from="ffn_out" />
-            <import from="attended_added" />
+            <import from="ln1$layer_norm_out" />
             <node op="Add">
                 <input src="ffn_out" />
-                <input src="attended_added" />
+                <input src="ln1$layer_norm_out" />
                 <output name="attended_added2" />
             </node>
             <export from="attended_added2" />
         </block>
 
-        <node name="LN3_Placeholder" op="Identity">
-            <input src="attended_added2" />
-            <output name="ln3$input" />
+        <node name="LN2_Placeholder" op="Identity">
+            <input src="attended_added" />
+            <output name="ln2$input" />
         </node>
-        <block src="layer_norm.agr" name="ln3" />
+        <block src="layer_norm.agr" name="ln2" />
 
         <!-- Queries come from prev layer, keys and values come from encoder -->
         <block title="CrossAttention" stretch="var(nheads)">
-            <import from="ln3$layer_norm_out" dim="[var(ntokens), var(dmodel)]" />
+            <import from="ln2$layer_norm_out" dim="[var(ntokens), var(dmodel)]" />
+            <import from="encoder_output" dim="[var(ntokens), var(dmodel)]" />
             <block title="LinearQKV">
-                <import from="ln3$layer_norm_out" />
+                <import from="ln2$layer_norm_out" />
                 <node op="MatMul">
-                    <input src="ln3$layer_norm_out" />
+                    <input src="ln2$layer_norm_out" />
                     <params name="QueryWeights2" dim="[var(dmodel), var(dqueries)]" />
                     <output name="queries2" dims="[var(ntokens), var(dqueries)]" />
                 </node>
@@ -249,17 +244,23 @@
 
         <block title="Add2">
             <import from="linear_concatenated2" />
-            <import from="attended_added2" />
+            <import from="ln2$layer_norm_out" />
             <node op="Add">
                 <input src="linear_concatenated2" />
-                <input src="attended_added2" />
+                <input src="ln2$layer_norm_out" />
                 <output name="attended2_added" />
             </node>
             <export from="attended2_added" />
         </block>
 
-        <export from="attended2_added" />
+        <node name="LN3_Placeholder" op="Identity">
+            <input src="attended2_added" />
+            <output name="ln3$input" />
+        </node>
+        <block src="layer_norm.agr" name="ln3" />
+
+        <export from="ln3$layer_norm_out" />
     </block>
 
-    <export from="attended2_added" dim="[var(ntokens), var(nvocab)]" />
+    <export from="ln3$layer_norm_out" dim="[var(ntokens), var(nvocab)]" />
 </model>

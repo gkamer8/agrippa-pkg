@@ -5,6 +5,13 @@ import torch
 import random
 import torch.nn.functional as F
 
+# From: https://huggingface.co/datasets/wmt14
+# which is a part of: https://github.com/huggingface/datasets
+
+# use this for bleu score: https://pytorch.org/text/stable/data_metrics.html
+
+# On brief exploration, looks like a good max number of tokens would be 256.
+
 tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
 other_lang = 'de'  # or "de"
 

@@ -13,7 +13,7 @@ import torch
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 from data_constants import BATCH_SIZE, SEQ_LENGTH, bos_token, device
-from preprocess import load_data
+from preprocess import load_data, get_str_from_ids
 
 proj_folder = "model"
 onnx_fname = "transformer.onnx"
@@ -96,7 +96,7 @@ if __name__ == '__main__':
 
     gradient_accum_steps = 5
 
-    warmup_steps = 2000
+    warmup_steps = 4000
 
     start_buffer = 0
 
@@ -121,8 +121,13 @@ if __name__ == '__main__':
             
             # Add dimension to data
 
-            other_data = F.one_hot(other.to(torch.int64)).float()
             english_data = F.one_hot(english.to(torch.int64)).float()
+
+            # (Batch, Seq length)
+            chopped = other[:, :-1]
+            to_cat = torch.full((BATCH_SIZE, 1), bos_token).to(device)
+            other_data = torch.cat((to_cat, chopped), -1).to(torch.int64)
+            other_data = F.one_hot(other_data.to(torch.int64)).float()
 
             # Make predictions for this batch
             # (decoder tokens, encoder tokens, decoder mask, encoder mask, pos embedding matrix)
@@ -131,13 +136,8 @@ if __name__ == '__main__':
             # Loss function expects labels in the form (Batch size, # Classes, other dimensions...)
             train_output = outputs.permute((0, 2, 1))
 
-            # (Batch, Seq length)
-            chopped = other[:, :-1]
-            to_cat = torch.full((BATCH_SIZE, 1), bos_token).to(device)
-            label = torch.cat((to_cat, chopped), -1).to(torch.int64)
-
             # Compute the loss and its gradients
-            loss = loss_fn(train_output, label) / gradient_accum_steps
+            loss = loss_fn(train_output, other.to(torch.int64)) / gradient_accum_steps
             loss.backward()
             accum_loss += loss.item()
 
