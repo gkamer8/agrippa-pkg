@@ -87,7 +87,7 @@ if __name__ == '__main__':
     loss_log = []
 
     current_lr = 0
-    optimizer = torch.optim.Adam(torch_model.parameters(), lr=current_lr, betas=(0.9, 0.98), eps=1e-09)
+    optimizer = torch.optim.Adam(torch_model.parameters(), lr=current_lr, betas=(0.9, 0.98), eps=10e-09)
     # optimizer = torch.optim.SGD(torch_model.parameters(), lr=current_lr)
 
     accum_loss = 0

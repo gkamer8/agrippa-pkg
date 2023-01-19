@@ -41,11 +41,11 @@
             <output name="decoder$Embed" />
         </node>
         <node op="Identity">
-            <input src="encoder_mask" />
+            <input src="decoder_mask" />
             <output name="decoder$mask" />
         </node>
         <node op="Identity">
-            <input src="encoder_tokens" />
+            <input src="decoder_tokens" />
             <output name="decoder$tokens" />
         </node>
         <node op="Identity">

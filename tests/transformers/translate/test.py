@@ -11,6 +11,7 @@ import torch.nn.functional as F
 import math
 import agrippa
 import numpy as np
+import onnxruntime as ort
 
 # From: https://huggingface.co/datasets/wmt14
 # which is a part of: https://github.com/huggingface/datasets
@@ -46,7 +47,7 @@ if __name__ == '__main__':
     print(get_str_from_ids(example[1]))
 
     print("Exporting model...")
-    agrippa.export("model", "transformer.onnx", index="transformer.agr", bindings=bindings, reinit=False, suppress=True)
+    agrippa.export("model", "transformer.onnx", index="transformer.agr", bindings=bindings, reinit=False)
     print("Exported")
 
     # Straight from Vaswani et al
@@ -70,8 +71,12 @@ if __name__ == '__main__':
 
     zeros_mask = torch.full((BATCH_SIZE, bindings['ntokens'], bindings['ntokens']), 0.).to(device)
 
+    ort_sess = ort.InferenceSession('transformer.onnx', providers=['CPUExecutionProvider'])
+
+    # outputs = ort_sess.run(None, {'decoder_tokens': other_data[rand_row].cpu().detach().numpy(), 'encoder_tokens': english_data[rand_row].cpu().detach().numpy(), 'decoder_mask': mask[rand_row].cpu().detach().numpy(), 'encoder_mask': zeros_mask[rand_row].cpu().detach().numpy(), 'posembedmatrix': posembeddingmatrix[rand_row].cpu().detach().numpy()})
+    # outputs = torch.tensor(outputs[0])
     outputs = torch_model(other_data[rand_row], english_data[rand_row], mask[rand_row], zeros_mask[rand_row], posembeddingmatrix[rand_row])
-    
+
     k = 20
 
     topk = torch.topk(outputs, k=k, dim=1)[1]  # gets indices of top 2 in tensor of shape (seq length, 2)
