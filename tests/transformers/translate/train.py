@@ -102,7 +102,7 @@ if __name__ == '__main__':
 
     nepochs = 3
 
-    save_batch_freq = 200
+    save_batch_freq = 100
 
     optim_steps = 1
     for epoch in range(nepochs):
