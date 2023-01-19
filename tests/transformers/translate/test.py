@@ -12,6 +12,7 @@ import math
 import agrippa
 import numpy as np
 import onnxruntime as ort
+import gc
 
 # From: https://huggingface.co/datasets/wmt14
 # which is a part of: https://github.com/huggingface/datasets
@@ -19,6 +20,23 @@ import onnxruntime as ort
 # use this for bleu score: https://pytorch.org/text/stable/data_metrics.html
 
 # On brief exploration, looks like a good max number of tokens would be 256.
+
+def beam_decode(decoder_outputs, tok_candidates, scores, pos=0, k=4):
+    new_candidates = list(tok_candidates)
+    # Returns new tok_candidates and scores
+    for i, decoder_output in enumerate(decoder_outputs):
+        sorted_logits, sorted_indices = torch.sort(decoder_output[pos], descending=True)
+        linears = sorted_logits[:k]
+        maxed = F.softmax(linears, dim=0)
+        maybe_scores = [scores[i] + maxed[k] for k in range(len(maxed))]
+        for k, maybe_score in enumerate(maybe_scores):
+            worst_current_i = min(range(len(scores)), key=lambda i: scores[i])
+            if maybe_score > scores[worst_current_i]:
+                scores[worst_current_i] = maybe_score
+                tok_candidates[i][pos] = sorted_indices[k]
+                new_candidate = tok_candidates[i]
+                new_candidates[worst_current_i] = new_candidate
+    return new_candidates, scores
 
 if __name__ == '__main__':
     device = "cpu"
@@ -47,7 +65,7 @@ if __name__ == '__main__':
     print(get_str_from_ids(example[1]))
 
     print("Exporting model...")
-    agrippa.export("model", "transformer.onnx", index="transformer.agr", bindings=bindings, reinit=False)
+    # agrippa.export("model", "transformer.onnx", index="transformer.agr", bindings=bindings, reinit=False)
     print("Exported")
 
     # Straight from Vaswani et al
@@ -72,14 +90,9 @@ if __name__ == '__main__':
     zeros_mask = torch.full((BATCH_SIZE, bindings['ntokens'], bindings['ntokens']), 0.).to(device)
 
     ort_sess = ort.InferenceSession('transformer.onnx', providers=['CPUExecutionProvider'])
-
-    # outputs = ort_sess.run(None, {'decoder_tokens': other_data[rand_row].cpu().detach().numpy(), 'encoder_tokens': english_data[rand_row].cpu().detach().numpy(), 'decoder_mask': mask[rand_row].cpu().detach().numpy(), 'encoder_mask': zeros_mask[rand_row].cpu().detach().numpy(), 'posembedmatrix': posembeddingmatrix[rand_row].cpu().detach().numpy()})
-    # outputs = torch.tensor(outputs[0])
     outputs = torch_model(other_data[rand_row], english_data[rand_row], mask[rand_row], zeros_mask[rand_row], posembeddingmatrix[rand_row])
 
-    k = 20
-
-    topk = torch.topk(outputs, k=k, dim=1)[1]  # gets indices of top 2 in tensor of shape (seq length, 2)
+    topk = torch.topk(outputs, k=1, dim=1)[1]  # gets indices of top 2 in tensor of shape (seq length, 2)
     tops = topk[:, 0].flatten()
 
     print()
@@ -91,27 +104,44 @@ if __name__ == '__main__':
     print()
     print("Sampling:")
 
-    temperature = .1
-    generation = torch.tensor([bos_token for _ in range(SEQ_LENGTH)])
+    k = 10
+    presence_penalty = 4
+    candidates = [torch.tensor([bos_token for _ in range(SEQ_LENGTH)]) for _ in range(k)]
+    scores = [0 for _ in range(k)]
     for i in range(SEQ_LENGTH):
-        data = F.one_hot(generation, num_classes=50257).float()
+        data_gen_cands = [torch.cat((torch.tensor([bos_token]), cand[:-1]), -1) for cand in candidates]
+        data_cands = [F.one_hot(data_gen, num_classes=50257).float() for data_gen in data_gen_cands]
 
-        outputs = torch_model(data, english_data[rand_row], mask[rand_row], zeros_mask[rand_row], posembeddingmatrix[rand_row])
+        outputs = []
+        for data in data_cands:
+            current = ort_sess.run(None, {'decoder_tokens': data.cpu().detach().numpy(),
+                                            'encoder_tokens': english_data[rand_row].cpu().detach().numpy(),
+                                            'decoder_mask': mask[rand_row].cpu().detach().numpy(),
+                                            'encoder_mask': zeros_mask[rand_row].cpu().detach().numpy(),
+                                            'posembedmatrix': posembeddingmatrix[rand_row].cpu().detach().numpy()})
+            current = torch.from_numpy(current[0])
+            
+            # Apply presence penalty
+            for id in data:
+                current[i][id.to(torch.int64)] /= presence_penalty
+            
+            outputs.append(current)
 
-        sorted_logits, sorted_indices = torch.sort(outputs[i], descending=True)
+        candidates, scores = beam_decode(outputs, candidates, scores, pos=i, k=k)
+        if i % 5 == 0:
+            print(f"At i={i}")
+            best_generation = candidates[max(range(len(scores)), key=lambda i: scores[i])]
+            print(get_str_from_ids(best_generation))
 
-        linears = sorted_logits[:k]
-
-        # linears = outputs[1][i]
-        linears /= temperature
-        maxed = F.softmax(linears, dim=0)
-
-        chosen = np.random.choice(sorted_indices[:k], p=maxed.detach().numpy())
-        # chosen = np.random.choice(sorted_indices[:k])  # uniform among top k
-        generation[i] = chosen
-
-        if chosen == bos_token and i > 4:  # 4 is arbitrary, just let it cook uk
+        all_end = True
+        for cand in candidates:
+            if cand[i] != bos_token:
+                all_end = False
+                break
+        if all_end:
             break
-
-    print(get_str_from_ids(generation))
+        
+    print("END")
+    best_generation = candidates[max(range(len(scores)), key=lambda i: scores[i])]
+    print(get_str_from_ids(best_generation))
 
