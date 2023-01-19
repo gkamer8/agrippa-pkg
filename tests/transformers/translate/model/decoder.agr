@@ -11,15 +11,15 @@
 
     <!-- Shrinks tokens into dmodel using a learned embedding -->
     <block title="Embedding">
-        <import from="tokens" />
+        <import from="Embed" />
         <node op="Mul" title="EmbedMul">
-            <input src="tokens" />
+            <input src="Embed" />
             <params dim="[1]" name="embeddings_scale" init="constant" init_args="[var(embed_scale)]" frozen="yes" />
             <output name="embed_scaled" />
         </node>
         <node op="MatMul" title="EmbedProjection">
+            <input src="tokens" />
             <input src="embed_scaled" />
-            <input src="Embed" />
             <output name="embeddings" />
         </node>
         <export from="embeddings" dim="[var(ntokens), var(dmodel)]" />

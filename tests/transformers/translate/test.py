@@ -46,7 +46,7 @@ if __name__ == '__main__':
     print(get_str_from_ids(example[1]))
 
     print("Exporting model...")
-    # agrippa.export("model", "transformer.onnx", index="transformer.agr", bindings=bindings, reinit=False, suppress=True)
+    agrippa.export("model", "transformer.onnx", index="transformer.agr", bindings=bindings, reinit=False, suppress=True)
     print("Exported")
 
     # Straight from Vaswani et al
@@ -90,9 +90,6 @@ if __name__ == '__main__':
     generation = torch.tensor([bos_token for _ in range(SEQ_LENGTH)])
     for i in range(SEQ_LENGTH):
         data = F.one_hot(generation, num_classes=50257).float()
-
-        print(posembeddingmatrix[rand_row])
-        exit(0)
 
         outputs = torch_model(data, english_data[rand_row], mask[rand_row], zeros_mask[rand_row], posembeddingmatrix[rand_row])
 
