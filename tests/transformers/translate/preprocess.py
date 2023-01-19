@@ -38,13 +38,13 @@ def tokenize_and_pad(example):
     return example
 
 # Yields (other language batch, english batch) each of shape (BATCH_SIZE, SEQ_LENGTH)
-def load_data():
+def load_data(split="train"):
 
     dataset = load_dataset("wmt14", f"{other_lang}-en").shuffle()
 
     batch_en = torch.empty((BATCH_SIZE, SEQ_LENGTH)).to(device)
     batch_other = torch.empty((BATCH_SIZE, SEQ_LENGTH)).to(device)
-    for i, example in enumerate(dataset['train']):
+    for i, example in enumerate(dataset[split]):
 
         x = tokenize_and_pad(example)
         batch_en[i % BATCH_SIZE] = x['translation']['en']

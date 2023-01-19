@@ -12,7 +12,6 @@ import math
 import agrippa
 import numpy as np
 import onnxruntime as ort
-import gc
 
 # From: https://huggingface.co/datasets/wmt14
 # which is a part of: https://github.com/huggingface/datasets
@@ -38,9 +37,26 @@ def beam_decode(decoder_outputs, tok_candidates, scores, pos=0, k=4):
                 new_candidates[worst_current_i] = new_candidate
     return new_candidates, scores
 
-if __name__ == '__main__':
-    device = "cpu"
+device = "cpu"
 
+# Straight from Vaswani et al
+posembeddingmatrix = torch.empty((BATCH_SIZE, bindings['ntokens'], bindings['dmodel']))
+for pos in range(len(posembeddingmatrix[0])):
+    for i in range(len(posembeddingmatrix[0][0])):
+        # Even indices get one thing, odd the other
+        if i % 2 == 0:
+            posembeddingmatrix[:, pos, i] = math.sin(pos/(10_000**(i/bindings['dmodel'])))
+        else:
+            posembeddingmatrix[:, pos, i] = math.cos(pos/(10_000**(i/bindings['dmodel'])))
+posembeddingmatrix = posembeddingmatrix.to(device)
+
+proto_mask = torch.full((BATCH_SIZE, bindings['ntokens'], bindings['ntokens']), -float("inf"))
+proto_mask[:] = torch.triu(proto_mask[0], diagonal=1)
+mask = proto_mask
+mask = mask.to(device)
+zeros_mask = torch.full((BATCH_SIZE, bindings['ntokens'], bindings['ntokens']), 0.).to(device)
+
+if __name__ == '__main__':
     max_len = 0
     german = ""
     english = ""
@@ -68,26 +84,8 @@ if __name__ == '__main__':
     # agrippa.export("model", "transformer.onnx", index="transformer.agr", bindings=bindings, reinit=False)
     print("Exported")
 
-    # Straight from Vaswani et al
-    posembeddingmatrix = torch.empty((BATCH_SIZE, bindings['ntokens'], bindings['dmodel']))
-    for pos in range(len(posembeddingmatrix[0])):
-        for i in range(len(posembeddingmatrix[0][0])):
-            # Even indices get one thing, odd the other
-            if i % 2 == 0:
-                posembeddingmatrix[:, pos, i] = math.sin(pos/(10_000**(i/bindings['dmodel'])))
-            else:
-                posembeddingmatrix[:, pos, i] = math.cos(pos/(10_000**(i/bindings['dmodel'])))
-    posembeddingmatrix = posembeddingmatrix.to(device)
-
-    proto_mask = torch.full((BATCH_SIZE, bindings['ntokens'], bindings['ntokens']), -float("inf"))
-    proto_mask[:] = torch.triu(proto_mask[0], diagonal=1)
-    mask = proto_mask
-    mask = mask.to(device)
-
     torch_model = agrippa.onnx_to_torch("transformer.onnx")
     torch_model = torch_model.to(device)
-
-    zeros_mask = torch.full((BATCH_SIZE, bindings['ntokens'], bindings['ntokens']), 0.).to(device)
 
     ort_sess = ort.InferenceSession('transformer.onnx', providers=['CPUExecutionProvider'])
     outputs = torch_model(other_data[rand_row], english_data[rand_row], mask[rand_row], zeros_mask[rand_row], posembeddingmatrix[rand_row])
@@ -104,8 +102,8 @@ if __name__ == '__main__':
     print()
     print("Sampling:")
 
-    k = 10
-    presence_penalty = 4
+    k = 4
+    presence_penalty = 2
     candidates = [torch.tensor([bos_token for _ in range(SEQ_LENGTH)]) for _ in range(k)]
     scores = [0 for _ in range(k)]
     for i in range(SEQ_LENGTH):
@@ -113,7 +111,7 @@ if __name__ == '__main__':
         data_cands = [F.one_hot(data_gen, num_classes=50257).float() for data_gen in data_gen_cands]
 
         outputs = []
-        for data in data_cands:
+        for j, data in enumerate(data_cands):
             current = ort_sess.run(None, {'decoder_tokens': data.cpu().detach().numpy(),
                                             'encoder_tokens': english_data[rand_row].cpu().detach().numpy(),
                                             'decoder_mask': mask[rand_row].cpu().detach().numpy(),
@@ -122,8 +120,8 @@ if __name__ == '__main__':
             current = torch.from_numpy(current[0])
             
             # Apply presence penalty
-            for id in data:
-                current[i][id.to(torch.int64)] /= presence_penalty
+            for id in candidates[j][:i]:
+                current[i][id] /= presence_penalty
             
             outputs.append(current)
 
