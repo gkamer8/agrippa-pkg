@@ -81,7 +81,7 @@ if __name__ == '__main__':
     print(get_str_from_ids(example[1]))
 
     print("Exporting model...")
-    # agrippa.export("model", "transformer.onnx", index="transformer.agr", bindings=bindings, reinit=False)
+    agrippa.export("model", "transformer.onnx", index="transformer.agr", bindings=bindings, reinit=False)
     print("Exported")
 
     torch_model = agrippa.onnx_to_torch("transformer.onnx")
@@ -102,7 +102,7 @@ if __name__ == '__main__':
     print()
     print("Sampling:")
 
-    k = 4
+    k = 1
     presence_penalty = 2
     candidates = [torch.tensor([bos_token for _ in range(SEQ_LENGTH)]) for _ in range(k)]
     scores = [0 for _ in range(k)]
