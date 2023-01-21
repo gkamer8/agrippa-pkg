@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import torch.nn.functional as F
 from data_constants import BATCH_SIZE, SEQ_LENGTH, bos_token, device
 from preprocess import load_data, get_str_from_ids
+import torch.nn
 
 proj_folder = "model"
 onnx_fname = "transformer.onnx"
@@ -54,12 +55,10 @@ if __name__ == '__main__':
     reinit_model = True
     # Convert xml to onnx
     agrippa.export(proj_folder, onnx_fname, index="transformer.agr", bindings=bindings, reinit=reinit_model, suppress=True)
-
     print("Exported")
 
     # Now we train
     torch_model = agrippa.onnx_to_torch(onnx_fname)
-    torch_model = torch_model.to(device)
 
     # Straight from Vaswani et al
     posembeddingmatrix = torch.empty((BATCH_SIZE, bindings['ntokens'], bindings['dmodel']))
@@ -92,9 +91,9 @@ if __name__ == '__main__':
 
     accum_loss = 0
 
-    max_train_size = 100_000  # total for an epoch
+    max_train_size = 100_000  # max total for an epoch
 
-    gradient_accum_steps = 5
+    gradient_accum_steps = 2
 
     warmup_steps = 4000
 
@@ -131,7 +130,7 @@ if __name__ == '__main__':
 
             # Make predictions for this batch
             # (decoder tokens, encoder tokens, decoder mask, encoder mask, pos embedding matrix)
-            outputs = torch_model(other_data, english_data, mask, zeros_mask, posembeddingmatrix)
+            outputs = torch_model(other_data, english_data, mask, zeros_mask, posembeddingmatrix).to(device)
             
             # Loss function expects labels in the form (Batch size, # Classes, other dimensions...)
             train_output = outputs.permute((0, 2, 1))

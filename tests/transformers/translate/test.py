@@ -103,7 +103,7 @@ if __name__ == '__main__':
     print("Sampling:")
 
     k = 1
-    presence_penalty = 2
+    presence_penalty = 1
     candidates = [torch.tensor([bos_token for _ in range(SEQ_LENGTH)]) for _ in range(k)]
     scores = [0 for _ in range(k)]
     for i in range(SEQ_LENGTH):

@@ -10,6 +10,7 @@ import agrippa
 import torch.nn.functional as F
 from train import bindings
 from test import mask, posembeddingmatrix, zeros_mask, beam_decode, device
+import torchtext
 
 
 if __name__ == '__main__':
@@ -32,7 +33,7 @@ if __name__ == '__main__':
 
             example = (other_batch[row], english_batch[row])
             k = 4
-            presence_penalty = 2
+            presence_penalty = 1
             candidates = [torch.tensor([bos_token for _ in range(SEQ_LENGTH)]) for _ in range(k)]
             scores = [0 for _ in range(k)]
             for i in range(SEQ_LENGTH):
@@ -74,5 +75,11 @@ if __name__ == '__main__':
             print("English:")
             print(get_str_from_ids(english_batch[row]))
 
+            reference = [get_str_from_ids(other_batch[row]).replace("<|endoftext|>", "").split()]
+            print(reference)
+            candidate = [get_str_from_ids(best_generation).replace("<|endoftext|>", "").split()]
+            print(candidate)
+            metric = torchtext.data.metrics.bleu_score(candidate, [reference])
+            print(f"Bleu score: {metric}")
             exit(0)
         

@@ -1,4 +1,4 @@
-BATCH_SIZE = 16
+BATCH_SIZE = 2
 SEQ_LENGTH = 100
-device = "cpu"
+device = "cuda:0"
 bos_token = 50256
