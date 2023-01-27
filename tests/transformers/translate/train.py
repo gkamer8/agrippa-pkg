@@ -59,6 +59,7 @@ if __name__ == '__main__':
 
     # Now we train
     torch_model = agrippa.onnx_to_torch(onnx_fname)
+    torch_model = torch_model.to(device)
 
     # Straight from Vaswani et al
     posembeddingmatrix = torch.empty((BATCH_SIZE, bindings['ntokens'], bindings['dmodel']))

@@ -132,7 +132,6 @@ for i in range(len(prompt_ids)-1, seq_length-1):
 
     sorted_logits, sorted_indices = torch.sort(outputs[1][i], descending=True)
 
-
     linears = sorted_logits[:k]
 
     # linears = outputs[1][i]

@@ -33,7 +33,7 @@
             <output name="encoder$posembedmatrix" />
         </node>
     </block>
-    <block src="encoder.agr" name="encoder" />
+    <block src="encoder.agr" name="encoder" title="Encoder" />
     
     <block title="DecoderPlaceholders">
          <node op="Identity">
@@ -57,7 +57,7 @@
             <output name="decoder$posembedmatrix" />
         </node>
     </block>
-    <block src="decoder.agr" name="decoder" />
+    <block src="decoder.agr" name="decoder" title="Decoder" />
 
     <block title="GetRevEmbedWeights">
         <import from="Embed" />

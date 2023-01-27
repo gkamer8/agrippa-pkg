@@ -2,39 +2,39 @@
     <import from="input" dim="[10, 5]" />
     <block title="LayerNorm">
         <import from="input" />
-        <node op="ReduceMean" axes="[-1]">
+        <node op="ReduceMean" axes="[-1]" title="Get Row Means">
             <input src="input" />
             <output name="means" />
         </node>
-        <node op="Sub">
+        <node op="Sub" title="Center Rows">
             <input src="input" />
             <input src="means" />
             <output name="centered" />
         </node>
-        <node op="Mul">
+        <node op="Mul" title="Square Rows Elementwise">
             <input src="centered" />
             <input src="centered" />
             <output name="squared" />
         </node>
-        <node op="ReduceMean" axes="[-1]">
+        <node op="ReduceMean" axes="[-1]" title="Find Variance">
             <input src="squared" />
             <output name="sigma_squared" />
         </node>
-        <node op="Sqrt">
+        <node op="Sqrt" title="Find Stdev">
             <input src="sigma_squared" />
             <output name="sigma" />
         </node>
-        <node op="Div">
+        <node op="Div" title="Reduce Gains By Stdev">
             <params name="gain" dim="[1, 5]" />
             <input src="sigma" />
             <output name="gains" />
         </node>
-        <node op="Mul">
+        <node op="Mul" title="Apply Gains">
             <input src="centered" />
             <input src="gains" />
             <output name="gained" />
         </node>
-        <node op="Add">
+        <node op="Add" title="Apply Biases" >
             <input src="gained" />
             <params dim="[1, 5]" name="biases" />
             <output name="layer_norm_out" />

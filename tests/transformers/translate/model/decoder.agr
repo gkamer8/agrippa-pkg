@@ -171,7 +171,7 @@
         </block>
 
         <node name="LN2_Placeholder" op="Identity">
-            <input src="attended_added" />
+            <input src="attended_added2" />
             <output name="ln2$input" />
         </node>
         <block src="layer_norm.agr" name="ln2" />
