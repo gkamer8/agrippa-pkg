@@ -210,6 +210,28 @@ agrippa.export(proj_name, onnx_out)
 torch_model = agrippa.onnx_to_torch(onnx_out)
 ```
 
+# Utilities
+
+Some utilities are available in agrippa.utils. This includes `find_params`, which returns weight (parameter) names and values as a dictionary. The returned dictionary includes parameters whose names contain the `name` argument (first argument) as a substring. Searching for weights in this way is recommended, since the names of parameters might be changed when the markup is compiled (for example, the names of weights that appear in repeated blocks). The `find_params` function takes two mandatory parameters and one optional: the substring that will be matched (mandatory), the directory of the project (mandatory), and the path to the weights file name within that directory (optional).
+
+## Example
+
+```
+matches = agrippa.utils.find_params('bias', 'FNN')
+print(matches)
+```
+The above code might print:
+```
+{'biases$1': array([[-0.77192398],
+       [-0.02351803],
+       [-0.00533084],
+       [ 0.13640493],
+       [-0.12087004]]), 'biases$2': array([[-0.18979854],
+       [-0.15769928],
+       [ 0.46656397],
+       [-0.10602235]])}
+```
+
 # Examples
 
 The following architecture is a simple feed forward network with five layers followed by a normalization. The architecture is organized into two blocks, the FFN and the norm layer. Inside the FFN is a FFN Layer block, which is repeated five times.
