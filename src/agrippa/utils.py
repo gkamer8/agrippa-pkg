@@ -24,7 +24,7 @@ def find_params(name, proj_dir, weights_fname="weights.pkl"):
     return matches
 
 # Takes a pytorch model and saves its weights file into the directory specified with the given name (by default, weights.pkl)
-def save_pytorch_model(torch_model, proj_dir, weights_fname="weights.pkl"):
+def save_torch_model(torch_model, proj_dir, weights_fname="weights.pkl"):
     weights_dict = {}
     whole_dict = torch_model.state_dict()
     for key in whole_dict:

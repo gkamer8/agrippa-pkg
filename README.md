@@ -212,9 +212,13 @@ torch_model = agrippa.onnx_to_torch(onnx_out)
 
 # Utilities
 
-Some utilities are available in agrippa.utils. This includes `find_params`, which returns weight (parameter) names and values as a dictionary. The returned dictionary includes parameters whose names contain the `name` argument (first argument) as a substring. Searching for weights in this way is recommended, since the names of parameters might be changed when the markup is compiled (for example, the names of weights that appear in repeated blocks). The `find_params` function takes two mandatory parameters and one optional: the substring that will be matched (mandatory), the directory of the project (mandatory), and the path to the weights file name within that directory (optional).
+Some utilities are available in agrippa.utils. This includes `find_params`, which returns weight (parameter) names and values as a dictionary. It also includes `save_torch_model`, which takes trained weights from a PyTorch model and saves them into a fresh `weights.pkl` file.
 
-## Example
+## Finding Parameters
+
+The returned dictionary includes parameters whose names contain the `name` argument (first argument) as a substring. Searching for weights in this way is recommended, since the names of parameters might be changed when the markup is compiled (for example, the names of weights that appear in repeated blocks). The `find_params` function takes two mandatory parameters and one optional: the substring that will be matched (mandatory), the directory of the project (mandatory), and the path to the weights file name within that directory (optional).
+
+### Example
 
 ```
 matches = agrippa.utils.find_params('bias', 'FNN')
@@ -230,6 +234,17 @@ The above code might print:
        [-0.15769928],
        [ 0.46656397],
        [-0.10602235]])}
+```
+
+## Saving Model from PyTorch
+
+After importing your model to PyTorch using `agrippa.onnx_to_torch`, you probably would like to save the trained weights. When imported into PyTorch, the names of the weights change slightly, so it is recommended that you save your models using `agrippa.utils.save_torch_model`, which takes as parameters the PyTorch model, the project directory, and (optionally) the weights filename inside that directory. Under the hood, this function loops over the `state_dict` of the PyTorch model, removes `initializer.` from the parameter's name, and saves it inside a dictionary to `weights.pkl`.
+
+### Example
+
+```
+# ... training loop
+agrippa.utils.save_torch_model(torch_model, "my-project", "weights.pkl")
 ```
 
 # Examples
