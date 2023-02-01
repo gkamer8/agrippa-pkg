@@ -3,6 +3,7 @@ sys.path.append('../../src')  # where the agrippa source code is stored
 
 import agrippa
 import torch
+import onnxruntime as ort
 
 """
 
@@ -59,3 +60,14 @@ print(f"Actual weights: {weights}")
 print()
 print(f"Target biases: {target_biases}")
 print(f"Actual biases: {biases}")
+
+agrippa.export(proj_name, 'testing.onnx', bindings=bindings, reinit=False)
+
+ort_sess = ort.InferenceSession(onnx_out, providers=['CPUExecutionProvider'])
+
+x, y = get_pair()
+x = x.detach().numpy()
+outputs = ort_sess.run(None, {'x': x})
+
+print(f"Label: {y}")
+print(f"Output: {outputs}")
