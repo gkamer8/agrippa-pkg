@@ -17,11 +17,11 @@ bindings = {
     'n': 5
 }
 
-agrippa.export(proj_name, 'testing.onnx', bindings=bindings, index="main.agr", suppress=True)
+agrippa.export(proj_name, 'testing.onnx', bindings=bindings, index="main.agr")
 
 torch_model = agrippa.onnx_to_torch(onnx_out)
 
-agrippa.utils.save_pytorch_model(torch_model, proj_name)
+agrippa.utils.save_torch_model(torch_model, proj_name)
 
 matches = agrippa.utils.find_params("B", proj_name)
 

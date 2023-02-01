@@ -1,0 +1,16 @@
+<model>
+    <import from="x" dim="[var(n)]" />
+    <block title="Linear">
+        <node op="Mul" title="Apply Betas">
+            <params name="W" dim="[var(n)]" />
+            <input src="x" />
+            <output name="wx" />
+        </node>
+        <node op="Add" title="Apply Biases">
+            <params name="b" dim="[var(n)]" />
+            <input src="wx" />
+            <output name="y" />
+        </node>
+    </block>
+    <export from="y" dim="[var(n)]" />
+</model>
