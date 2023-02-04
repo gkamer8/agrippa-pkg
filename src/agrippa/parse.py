@@ -533,11 +533,11 @@ def export(
                 try:
                     kwargs["kernel_shape"] = _resolve_attr(node.attrib['kernel_shape'], bindings, expect_value=True)
                 except KeyError:
-                    raise SyntaxError(f"Expecting attribute 'kernel_shape' for Conv node")
+                    pass
                 try:
                     kwargs["pads"] = _resolve_attr(node.attrib['pads'], bindings, expect_value=True)
                 except KeyError:
-                    raise SyntaxError(f"Expecting attribute 'pads' for Conv node")
+                    pass
                 # optionals
                 try:
                     kwargs["dilations"] = _resolve_attr(node.attrib['dilations'], bindings, expect_value=True)
