@@ -527,6 +527,29 @@ def export(
                     kwargs["alpha"] = _resolve_attr(node.attrib['alpha'], bindings, expect_value=True)
                 except KeyError:
                     raise SyntaxError(f"Expecting attribute 'alpha' for LeakyRelu node")
+            elif op == "Conv":
+                # refer to: https://github.com/onnx/onnx/blob/main/docs/Operators.md#Conv
+                inputs = splice_inputs(inputs, params, param_precedence)
+                try:
+                    kwargs["kernel_shape"] = _resolve_attr(node.attrib['kernel_shape'], bindings, expect_value=True)
+                except KeyError:
+                    raise SyntaxError(f"Expecting attribute 'kernel_shape' for Conv node")
+                try:
+                    kwargs["pads"] = _resolve_attr(node.attrib['pads'], bindings, expect_value=True)
+                except KeyError:
+                    raise SyntaxError(f"Expecting attribute 'pads' for Conv node")
+                # optionals
+                try:
+                    kwargs["dilations"] = _resolve_attr(node.attrib['dilations'], bindings, expect_value=True)
+                except KeyError:
+                    pass
+                try:
+                    kwargs["strides"] = _resolve_attr(node.attrib['strides'], bindings, expect_value=True)
+                except KeyError:
+                    pass
+            else:
+                raise SyntaxError(f"Unknown op type '{op}'") 
+
             new_node = onnx.helper.make_node(
                 name=title,
                 op_type=op,

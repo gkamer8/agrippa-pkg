@@ -1,0 +1,15 @@
+<model>
+
+    <import from="image" dim="[var(batch), var(C), var(H), var(W)]" />
+
+    <block>
+        <node op="Conv" kernel_shape="[var(kH), var(kW)]" pads="[1, 1, 1, 1]" >
+            <input src="image" />
+            <params name="W" dim="[var(M), var(C), var(kH), var(kW)]" init="ones" />
+            <output name="y" />
+        </node>
+    </block>
+
+    <export from="y" dim="[var(batch), var(C), var(oH), var(oW)]" />
+
+</model>
