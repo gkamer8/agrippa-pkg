@@ -4,14 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agrippa"
-version = "0.1.0"
+version = "1.0.1"
 description = "Making AI easier"
 readme = "README.md"
-authors = [{ name = "Gordon Kamer", email = "gkamer@outlook.com" }]
+authors = [{ name = "Gordon Kamer", email = "gordon@agrippa.build" }]
 license = { file = "LICENSE" }
-keywords = ["ml", "ai"]
+keywords = ["ml", "ai", "artificial intelligence", "neural networks"]
 dependencies = [
     "numpy <= 1.23.4",
-    "onnx >= 1.12.0"
+    "onnx >= 1.12.0",
+    "torch >= 1.13.1",
+    "torchvision >= 0.14.1"
 ]
 requires-python = ">=3.8"
