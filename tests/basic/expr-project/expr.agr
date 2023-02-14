@@ -4,6 +4,8 @@
 
     <import dim="[expr(bound1*bound2), expr(bound2)]" from="input2" type="float32" />
 
+    <import dim="[expr(x//y), expr(x//5)]" from="input3" type="float32" />
+
     <block title="SimpleRelu">
         <node op="Relu">
             <input src="input" />
@@ -18,8 +20,17 @@
         </node>
     </block>
 
+    <block title="SimpleRelu3">
+        <node op="Relu">
+            <input src="input3" />
+            <output name="y3" />
+        </node>
+    </block>
+
     <export dim="[expr(3*2), expr(3)]" from="y" type="float32" />
 
     <export dim="[expr( bound1    * bound2 ), expr( bound2 )]" from="y2" type="float32" />
+
+    <export dim="[expr(x // y), expr(x // 5)]" from="y3" type="float32" />
 
 </model>

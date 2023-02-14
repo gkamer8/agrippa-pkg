@@ -2,10 +2,11 @@ import json
 from lib2to3.pgen2 import token
 
 # OP: PRECEDENCE
-BINARY_OPS_PRECEDENCE = {
+BIN_OP_PRECEDENCE = {
     '^': 2,
     '*': 1,
     '/': 1,
+    '//': 1,
     '%': 1,
     '-': 0,
     '+': 0,
@@ -15,9 +16,16 @@ BIN_OP_FUNCTIONS = {
     '^': lambda x, y: x**y,
     '*': lambda x, y: x*y,
     '/': lambda x, y: x/y,
+    '//': lambda x, y: x // y,
     '%': lambda x, y: x%y,
     '-': lambda x, y: x-y,
     '+': lambda x, y: x+y
+}
+
+# For dealing with two char long ops
+# suffix -> full op
+BIN_OP_SUFFIXES = {
+    '/': '//'
 }
 
 def _tokenize(text, bindings):
@@ -25,10 +33,16 @@ def _tokenize(text, bindings):
 
     working_text = ""
     for c in text:
-        if c in BINARY_OPS_PRECEDENCE:
+        if c in BIN_OP_PRECEDENCE:
             if working_text:
                 tokens.append(working_text)
                 working_text = ""
+            if c in BIN_OP_SUFFIXES:
+                if len(tokens) > 0:
+                    working_op = tokens[-1] + c
+                    if working_op in BIN_OP_PRECEDENCE:
+                        tokens[-1] = working_op
+                        continue
             tokens.append(c)
         elif c in [' ']:  # separation characters
             if working_text:
@@ -44,7 +58,7 @@ def _tokenize(text, bindings):
     return tokens
 
 def _has_leq_precedence(first, second):
-    return BINARY_OPS_PRECEDENCE[first] <= BINARY_OPS_PRECEDENCE[second]
+    return BIN_OP_PRECEDENCE[first] <= BIN_OP_PRECEDENCE[second]
 
 def _infix_to_prefix(infix):
     operators = []
@@ -92,7 +106,7 @@ def _eval(toks):
     toks = toks[::-1]
     stack = []
     for tok in toks:
-        if tok in BINARY_OPS_PRECEDENCE:
+        if tok in BIN_OP_PRECEDENCE:
             operand1 = stack.pop()
             operand2 = stack.pop()
             # If we're operating on them, they must be values of some kind
