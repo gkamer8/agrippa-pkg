@@ -1,5 +1,6 @@
 import pickle
 import os
+import json
 
 """
 
@@ -33,3 +34,41 @@ def save_torch_model(torch_model, proj_dir, weights_fname="weights.pkl"):
 
     with open(os.path.join(proj_dir, weights_fname), 'wb') as fhand:
         pickle.dump(weights_dict, fhand)
+
+"""
+Takes search log and substring, returns new dictionary with log info matching name
+Note that we're searching "names", not output names (so title of node must match)
+
+Example:
+
+Current log file:
+{
+    'nodes': [
+        {'name': 'dog', 'inputs': 'food'},
+        {'name': 'cat', 'inputs': 'hair'}
+    ]
+    'initializer': [
+        {'name': 'bone'}
+    ]
+}
+
+Returned object searching for "dog":
+
+{
+    'nodes': [
+        {'name': 'dog', 'inputs': 'food'},
+    ]
+    'initializer': []
+}
+"""
+def search_log(name, log_file="log.json"):
+    with open(log_file) as fhand:
+        obj = json.load(fhand)
+        new_obj = {}
+        for key in obj:
+            new_matches = []
+            for el in obj[key]:
+                if name in el['name']:
+                    new_matches.append(el)
+            new_obj[key] = new_matches
+        return new_obj

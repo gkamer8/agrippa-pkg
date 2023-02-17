@@ -16,9 +16,7 @@ onnx_fname = "test-decoder.onnx"
 #txt = """The die is cast; I have consented to return if we are not destroyed.
 #Thus are my hopes blasted by cowardice and"""
 
-txt = """This eBook is for the use of anyone anywhere in the United States and
-most other parts of the world at no cost and with almost no restrictions
-whatsoever. You may copy it, give it away or re-use it"""
+txt = """Abraham Lincoln was an American lawyer, politician, and a Republican"""
 
 tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
 tokens = tokenizer(txt)['input_ids']
@@ -39,7 +37,11 @@ bindings = {
 }
 
 # Convert xml to onnx
-agrippa.export(proj_folder, onnx_fname, index='exposed.agr', bindings=bindings, reinit=False, suppress=False)
+agrippa.export(proj_folder, onnx_fname, bindings=bindings, log=True)
+
+logs = agrippa.utils.search_log("FinalDecoderAdd")
+
+print(logs)
 
 torch_model = agrippa.onnx_to_torch(onnx_fname)
 
@@ -70,39 +72,58 @@ for pos in range(len(posembeddingmatrix)):
 # Make predictions for this batch
 outputs = torch_model(data, mask, scale, posembeddingmatrix, embed_scale, ln_eps)
 
-print(outputs[0])
+def log_prob_at(layer):
 
-topk = torch.topk(outputs[0], k=20, dim=1)[1]
+    topk = torch.topk(outputs[layer], k=20, dim=1)[1]
 
-tops = topk[:, 0].flatten()
+    tops = topk[:, 0].flatten()
 
-y = tokenizer.convert_ids_to_tokens(list(tops))
+    y = tokenizer.convert_ids_to_tokens(list(tops))
 
-print("Target:")
-print(txt)
+    print("Target:")
+    print(txt)
 
-print("(target) | (prediction1)")
-print()
-for i in range(len(outputs[0])):
-    tar = tokenizer.convert_ids_to_tokens([tokens[i]])
-    tar = tokenizer.convert_tokens_to_string(tar)
-    pred = tops[i]
-    pred = tokenizer.convert_ids_to_tokens([pred])
-    pred = tokenizer.convert_tokens_to_string(pred)
-    print(f"({tar}) | ({pred})")
+    print("(target) | (prediction1)")
+    print()
+    for i in range(len(outputs[layer])):
+        tar = tokenizer.convert_ids_to_tokens([tokens[i]])
+        tar = tokenizer.convert_tokens_to_string(tar)
+        pred = tops[i]
+        pred = tokenizer.convert_ids_to_tokens([pred])
+        pred = tokenizer.convert_tokens_to_string(pred)
+        print(f"({tar}) | ({pred})")
 
-print()
-print("(target) | (prediction2)")
-print()
+    print()
+    print("(target) | (prediction2)")
+    print()
 
-tops = topk[:, 1].flatten()
-for i in range(len(outputs[0])):
-    tar = tokenizer.convert_ids_to_tokens([tokens[i]])
-    tar = tokenizer.convert_tokens_to_string(tar)
-    pred = tops[i]
-    pred = tokenizer.convert_ids_to_tokens([pred])
-    pred = tokenizer.convert_tokens_to_string(pred)
-    print(f"({tar}) | ({pred})")
+    tops = topk[:, 1].flatten()
+    for i in range(len(outputs[layer])):
+        tar = tokenizer.convert_ids_to_tokens([tokens[i]])
+        tar = tokenizer.convert_tokens_to_string(tar)
+        pred = tops[i]
+        pred = tokenizer.convert_ids_to_tokens([pred])
+        pred = tokenizer.convert_tokens_to_string(pred)
+        print(f"({tar}) | ({pred})")
+
+# 25777 is Republican
+# print("Last layer:")
+# log_prob_at(1)
+# print("Penultimate layer:")
+# log_prob_at(2)
+
+token_labs = ["R-can", "person", "Democrat", "the", "eos", "chair", "good", "liar"]
+tokens =     [3415,     1048,    9755,       1169,  50256, 5118,     922,    31866]
+for l in range(1, 7):
+    output_num = 7-l
+    print()
+    print(f"Log probs at layer {l}")
+
+    for i in range(len(tokens)):
+        log_prob = round(outputs[output_num][-1][tokens[i]].item(), 2)
+        print(f"{token_labs[i]}: {log_prob}")
+
+exit(0)
 
 print()
 

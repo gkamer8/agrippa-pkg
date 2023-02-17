@@ -19,6 +19,8 @@ ONNX_TYPE_DICT = {
 DEFAULT_TYPE = "float32"
 DEFAULT_INIT_TYPE = "xavier"
 
+LOG_FILENAME = "log.json"  # Default filename when log=True in export
+
 suppress_prints = False  # global variable
 
 # For print statements
@@ -197,6 +199,8 @@ def export(
         suppress=False,
         reinit=False,
         bindings=None,
+        log=False,  # Write a log file for the compilation
+        log_filename=LOG_FILENAME,
         index=None  # Main file that things are imported into
     ):
 
@@ -357,6 +361,12 @@ def export(
                 raise SyntaxError("Op type not specified for some node")
 
             try:
+                expose_str = _resolve_attr(node.attrib['expose'], bindings, expect_value=False)
+                expose = expose_str == "yes"
+            except KeyError:
+                expose = False
+
+            try:
                 title = node.attrib['title']
                 title = _resolve_attr(node.attrib['title'], bindings, expect_value=False)
             except KeyError:
@@ -368,7 +378,7 @@ def export(
             input_els = node.findall("input")
             naive_inputs = [_resolve_attr(el.attrib['src'], bindings, expect_value=False) for el in input_els]
             inputs = [make_imported_name(x, imp_name) for x in naive_inputs]  # change name if file is from other source
-            inputs = [name_resolves[x] if x in name_resolves else x for x in inputs]
+            inputs = [name_resolves[x] if x in name_resolves and not expose else x for x in inputs]
 
             output_els = node.findall("output")
             naive_outputs = [_resolve_attr(el.attrib['name'], bindings, expect_value=False) for el in output_els]
@@ -742,6 +752,42 @@ def export(
                                             ONNX_TYPE_DICT[child_type],
                                             dim)
         all_outputs.append(x)
+
+    # If log, produce a log file with node names, inputs, and so on.
+    if log:
+        _notify(f"Writing export log to {log_filename}")
+        with open(log_filename, "w") as fhand:
+
+            json_nodes = []
+            for node in all_nodes:
+                json_nodes.append({
+                    'name': str(node.name),
+                    'input': str(node.input),
+                    'output': str(node.output),
+                    'op': str(node.op_type)
+                })
+            json_inputs = []
+            for input in all_inputs:
+                json_inputs.append({
+                    'name': input.name
+                })
+            json_outputs = []
+            for output in all_outputs:
+                json_outputs.append({
+                    'name': output.name
+                })
+            json_inits = []
+            for init in all_inits:
+                json_inits.append({
+                    'name': init.name
+                })
+            to_write = {
+                'nodes': json_nodes,
+                'inputs': json_inputs,
+                'outputs': json_outputs,
+                'initializer': json_inits
+            }
+            json.dump(to_write, fhand)
 
     # Create the graph (GraphProto)
     graph_def = onnx.helper.make_graph(

@@ -1,3 +1,4 @@
 decoder.onnx
 __pycache__
 test-decoder.onnx
+log.json
