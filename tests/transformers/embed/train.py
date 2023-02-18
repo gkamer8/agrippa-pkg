@@ -74,13 +74,6 @@ def get_posembeddings(isDecoder=False):
     return posembeddingmatrix
 
 
-def get_encoder_output_mask():
-    # (BATCH SIZE, SEQ LENGTH, dmodel) w/ 1s in last sequence position
-    encoder_output_mask = torch.full((BATCH_SIZE, SEQ_LENGTH, bindings['dmodel']), 0.)
-    encoder_output_mask[:, -1, :] = 1.
-    return encoder_output_mask
-
-
 if __name__ == '__main__':
 
     reinit_model = True
@@ -106,8 +99,10 @@ if __name__ == '__main__':
     # My weird masks
     encoder_output_mask = torch.full((BATCH_SIZE, bindings['ntokens'], bindings['dmodel']), 0.)
     encoder_output_mask[:, -1, :] = 1.
+    encoder_output_mask = encoder_output_mask.to(device)
     decoder_embed_removal_mask = torch.full((BATCH_SIZE, bindings['ntokens'], bindings['dmodel']), 1.)
     decoder_embed_removal_mask[:, -1, :] = 0.
+    decoder_embed_removal_mask = decoder_embed_removal_mask.to(device)
     # Vaswani et al use label smoothing = 0.1
     loss_fn = torch.nn.CrossEntropyLoss(label_smoothing=0.1)
     # loss_fn = torch.nn.MSELoss()

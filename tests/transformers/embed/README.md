@@ -13,3 +13,12 @@ Document embedding is last embedding outputted from the encoder. That embedding 
 ## Running
 
 Set the data_constants appropriately and then run the train script.
+
+(note to Gordon) You'll need to: clone repo, install requirements, change .emacs file, change data_constants, run train script.
+
+For seq=100, good batch size seems like 128
+
+## Arch Notes
+
+Scales embeddings up by sqrt(dmodel) for input. It's a post-LN architecture. All in all pretty normal.
+
