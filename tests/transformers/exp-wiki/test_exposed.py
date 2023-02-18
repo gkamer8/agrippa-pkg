@@ -10,6 +10,7 @@ import pickle
 import numpy as np
 import os
 
+
 proj_folder = "model"
 onnx_fname = "test-decoder.onnx"
 
@@ -17,9 +18,12 @@ onnx_fname = "test-decoder.onnx"
 #Thus are my hopes blasted by cowardice and"""
 
 txt = """Abraham Lincoln was an American lawyer, politician, and a Republican"""
+# token length matched for convenience
+txt2 = "Joseph R Biden was an American lawyer, politician, and a Democrat"
 
 tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
 tokens = tokenizer(txt)['input_ids']
+tokens2 = tokenizer(txt2)['input_ids']
 
 seq_length = len(tokens)
 
@@ -36,20 +40,47 @@ bindings = {
     'nlayers': 6
 }
 
+# Change weight
+DEL_WEIGHTS = True
+if DEL_WEIGHTS:
+    weight_dict = {}
+    with open("model/weights.pkl", 'rb') as fhand: 
+        weight_dict = pickle.load(fhand)
+        indices_to_delete = [i for i in range(5, 13)]
+        prefixes_to_delete = [
+            'KeyWeights',
+            'QueryWeights'
+        ]
+        for pre in prefixes_to_delete:
+            for i in indices_to_delete:
+                del weight_dict[pre + "$" + str(i)]
+
+    with open("model/weights.pkl", 'wb') as fhand: 
+        pickle.dump(weight_dict, fhand)
+
 # Convert xml to onnx
 agrippa.export(proj_folder, onnx_fname, bindings=bindings, log=True)
 
+print("Search for FinalDecoderAdd:")
 logs = agrippa.utils.search_log("FinalDecoderAdd")
-
+print(logs)
+print()
+print("Search for AttentionSoftmax")
+logs = agrippa.utils.search_log("AttentionSoftmax")
 print(logs)
 
 torch_model = agrippa.onnx_to_torch(onnx_fname)
 
-bos_token = 50256
-chopped = torch.tensor(tokens[:-1])
-to_cat = torch.full((1,), bos_token)
-x = torch.cat((to_cat, chopped), -1)
-data = F.one_hot(x, num_classes=50257).float()
+def get_data_from_tokens(toks):
+    bos_token = 50256
+    chopped = torch.tensor(toks[:-1])
+    to_cat = torch.full((1,), bos_token)
+    x = torch.cat((to_cat, chopped), -1)
+    data = F.one_hot(x, num_classes=50257).float()
+    return data
+
+data = get_data_from_tokens(tokens)
+data2 = get_data_from_tokens(tokens2)
 
 scale = math.sqrt(bindings['dmodel'])
 embed_scale = math.sqrt(bindings['dmodel'])
@@ -71,6 +102,7 @@ for pos in range(len(posembeddingmatrix)):
 
 # Make predictions for this batch
 outputs = torch_model(data, mask, scale, posembeddingmatrix, embed_scale, ln_eps)
+outputs2 = torch_model(data2, mask, scale, posembeddingmatrix, embed_scale, ln_eps)
 
 def log_prob_at(layer):
 
@@ -107,23 +139,47 @@ def log_prob_at(layer):
         print(f"({tar}) | ({pred})")
 
 # 25777 is Republican
-# print("Last layer:")
-# log_prob_at(1)
+print("Last layer:")
+log_prob_at(1)
 # print("Penultimate layer:")
 # log_prob_at(2)
 
+
+# For last (Republican)
 token_labs = ["R-can", "person", "Democrat", "the", "eos", "chair", "good", "liar"]
 tokens =     [3415,     1048,    9755,       1169,  50256, 5118,     922,    31866]
+token_pos = -1
+"""
+# For "lawyer" (__ was an American [lawyer])
+token_labs = ["lawyer", "person", "the", "eos", "chair", "politician", "novelist", "American"]
+tokens =     [6853,     1048,     1169,  50256, 5118,     14971,        37986,     1605]
+token_pos = 6
+"""
 for l in range(1, 7):
-    output_num = 7-l
+    output_num = 7 - l
     print()
-    print(f"Log probs at layer {l}")
-
+    print(f"Probs at layer {l}")
+    print()
+    print("For Lincoln:")
+    print()
     for i in range(len(tokens)):
-        log_prob = round(outputs[output_num][-1][tokens[i]].item(), 2)
-        print(f"{token_labs[i]}: {log_prob}")
+        prob = round(torch.exp(outputs[output_num][token_pos][tokens[i]]).item() / torch.sum(torch.exp(outputs[output_num][-1])).item(), 5)
+        print(f"{token_labs[i]}: {prob}")
+    print()
+    print("For Biden:")
+    print()
+    for i in range(len(tokens)):
+        prob = round(torch.exp(outputs2[output_num][token_pos][tokens[i]]).item() / torch.sum(torch.exp(outputs2[output_num][-1])).item(), 5)
+        print(f"{token_labs[i]}: {prob}")
+
 
 exit(0)
+
+for l in range(1, 9):
+    output_num = 7 + l - 1
+    print()
+    print(f"Attention Matrix At {l}")
+    print(round(outputs[output_num][-1][2].item(), 5))
 
 print()
 

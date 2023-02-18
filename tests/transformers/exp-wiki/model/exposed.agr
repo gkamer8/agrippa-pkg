@@ -377,4 +377,47 @@
     <export from="end_linear_layer_3" dim="[var(ntokens), var(nvocab)]" />
     <export from="end_linear_layer_2" dim="[var(ntokens), var(nvocab)]" />
     <export from="end_linear_layer_1" dim="[var(ntokens), var(nvocab)]" />
+
+    <block title="GetAttentionMatrices">
+        <node op="Identity" expose="yes">
+            <input src="softmaxed$79" />
+            <output name="internal_attention_1" />
+        </node>
+        <node op="Identity" expose="yes">
+            <input src="softmaxed$80" />
+            <output name="internal_attention_2" />
+        </node>
+        <node op="Identity" expose="yes">
+            <input src="softmaxed$81" />
+            <output name="internal_attention_3" />
+        </node>
+        <node op="Identity" expose="yes">
+            <input src="softmaxed$82" />
+            <output name="internal_attention_4" />
+        </node>
+        <node op="Identity" expose="yes">
+            <input src="softmaxed$83" />
+            <output name="internal_attention_5" />
+        </node>
+        <node op="Identity" expose="yes">
+            <input src="softmaxed$84" />
+            <output name="internal_attention_6" />
+        </node>
+        <node op="Identity" expose="yes">
+            <input src="softmaxed$85" />
+            <output name="internal_attention_7" />
+        </node>
+        <node op="Identity" expose="yes">
+            <input src="softmaxed$86" />
+            <output name="internal_attention_8" />
+        </node>
+    </block>
+    <export from="internal_attention_1" dim="[var(ntokens), var(ntokens)]" />
+    <export from="internal_attention_2" dim="[var(ntokens), var(ntokens)]" />
+    <export from="internal_attention_3" dim="[var(ntokens), var(ntokens)]" />
+    <export from="internal_attention_4" dim="[var(ntokens), var(ntokens)]" />
+    <export from="internal_attention_5" dim="[var(ntokens), var(ntokens)]" />
+    <export from="internal_attention_6" dim="[var(ntokens), var(ntokens)]" />
+    <export from="internal_attention_7" dim="[var(ntokens), var(ntokens)]" />
+    <export from="internal_attention_8" dim="[var(ntokens), var(ntokens)]" />
 </model>
