@@ -1,0 +1,182 @@
+<model script-version="0.0.1">
+
+    <!-- Uses default type, which is float32 -->
+    <!-- For tokens: each row is a one hot vector, sequence proceeds vertically in the matrix -->
+
+    <import from="tokens" dim="[var(ntokens), var(nvocab)]" />
+    <import from="mask" dim="[var(ntokens), var(ntokens)]" />
+    <import from="posembedmatrix" dim="[var(ntokens), var(dmodel)]" />
+    <import from="Embed" dim="[var(nvocab), var(dmodel)]" />
+
+    <!-- Shrinks tokens into dmodel using a learned embedding -->
+    <block title="Embedding">
+        <import from="Embed" />
+        <node op="Mul" title="EmbedMul">
+            <input src="Embed" />
+            <params dim="[1]" name="embeddings_scale" init="constant" init_args="[var(embed_scale)]" frozen="yes" />
+            <output name="embed_scaled" />
+        </node>
+        <node op="MatMul" title="EmbedProjection">
+            <input src="tokens" />
+            <input src="embed_scaled" />
+            <output name="embeddings" />
+        </node>
+        <export from="embeddings" dim="[var(ntokens), var(dmodel)]" />
+    </block>
+
+    <block title="PositionalEmbedding">
+        <import from="embeddings" />
+        <import from="posembedmatrix" />
+        <node op="Add">
+            <input src="embeddings" />
+            <input src="posembedmatrix" />
+            <output name="posembeddings" />
+        </node>
+        <export from="posembeddings" dim="[var(ntokens), var(dmodel)]" />
+    </block>
+
+    <!-- The big encoder block -->
+    <block title="DecoderLayer" rep="var(nlayers)">
+        <import from="posembeddings" dim="[var(ntokens), var(dmodel)]" />
+
+        <block title="Attention" stretch="var(nheads)">
+            <import from="posembeddings" dim="[var(ntokens), var(dmodel)]" />
+            <import from="mask" dim="[var(ntokens), var(ntokens)]" />
+            <block title="LinearQKV">
+                <import from="posembeddings" />
+                <node op="MatMul">
+                    <input src="posembeddings" />
+                    <params name="QueryWeights" dim="[var(dmodel), var(dqueries)]" />
+                    <output name="queries" dims="[var(ntokens), var(dqueries)]" />
+                </node>
+                <node op="MatMul">
+                    <input src="posembeddings" />
+                    <params name="KeyWeights" dim="[var(dmodel), var(dkeys)]" />
+                    <output name="keys" dims="[var(ntokens), var(dkeys)]" />
+                </node>
+                <node op="MatMul">
+                    <input src="posembeddings" />
+                    <params name="ValueWeights" dim="[var(dmodel), var(dvalues)]" />
+                    <output name="values" dim="[var(ntokens), var(dvalues)]" />
+                </node>
+                <export from="queries" />
+                <export from="keys" />
+                <export from="values" />
+            </block>
+            <block title="ScaledDotProductAttention">
+                <import from="mask" dim="[var(ntokens), var(ntokens)]" />
+                <import from="queries" />
+                <import from="values" />
+                <import from="keys" />
+                <node op="Transpose">
+                    <input src="keys" />
+                    <output name="keys_t" dim="[var(dkeys), var(ntokens)]" />
+                </node>
+                <node op="MatMul">
+                    <input src="queries" />
+                    <input src="keys_t" />
+                    <output name="matmul" dim="[var(ntokens), var(ntokens)]" />
+                </node>
+                <node op="Div">
+                    <input src="matmul" />
+                    <params name="scale" frozen="yes" dim="[1]" init="constant" init_args="[var(scale)]" />
+                    <output name="scaled" />
+                </node>
+                <node title="Mask" op="Add">
+                    <input src="scaled" />
+                    <input src="mask" />
+                    <output name="masked" />
+                </node>
+                <node op="Softmax" axis="-1">
+                    <input src="masked" />
+                    <output name="softmaxed" />
+                </node>
+                <node op="MatMul" title="ValueMatmul">
+                    <input src="softmaxed" />
+                    <input src="values" />
+                    <output name="attended" dim="[var(ntokens), var(dvalues)]" />
+                </node>
+            </block>            
+            <export from="attended" />
+        </block>
+
+        <block title="ConcatLinear">
+            <import from="attended" />
+            <node op="MatMul">
+                <input src="attended" />
+                <params name="LinearConcatW" dim="[expr(dvalues * nheads), var(dmodel)]" />
+                <output name="linear_concatenated" />
+            </node>
+            <export from="linear_concatenated" />
+        </block>
+        
+        <block title="Add">
+            <import from="linear_concatenated" />
+            <import from="posembeddings" />
+            <node op="Add">
+                <input src="linear_concatenated" />
+                <input src="posembeddings" />
+                <output name="attended_added" />
+            </node>
+            <export from="attended_added" />
+        </block>
+
+        <node name="LN1_Placeholder" op="Identity">
+            <input src="attended_added" />
+            <output name="ln1$input" />
+        </node>
+        <block src="layer_norm.agr" name="ln1" />
+
+        <block title="FFN">
+            <import from="ln1$layer_norm_out" />
+            <node op="MatMul">
+                <input src="ln1$layer_norm_out" />
+                <params name="ffn_w" dim="[var(dmodel), var(dffnhidden)]" />
+                <output name="ffn_projected" dim="[var(ntokens), var(dffnhidden)]" />
+            </node>
+            <node op="Add" title="FFNBiases" >
+                <input src="ffn_projected" />
+                <!-- Note that the biases are numpy style broadcasted,
+                        so the FFN remains identical for each position -->
+                <params name="ffn_b" dim="[var(dffnhidden)]" init="zeros" />
+                <output name="ffn_biased" />
+            </node>
+            <node op="Relu">
+                <input src="ffn_biased" />
+                <output name="ffn_relu" />
+            </node>
+            <node op="MatMul">
+                <input src="ffn_relu" />
+                <params name="ffn_w2" dim="[var(dffnhidden), var(dmodel)]" />
+                <output name="ffn_second_proj" />
+            </node>
+            <node op="Add" title="FFNBiases2">
+                <input src="ffn_second_proj" />
+                <params name="ffn_b2" dim="[var(dmodel)]" init="zeros" />
+                <output name="ffn_out" />
+            </node>
+            <export from="ffn_out" />
+        </block>
+
+        <block title="Add2">
+            <import from="ffn_out" />
+            <import from="ln1$layer_norm_out" />
+            <node op="Add">
+                <input src="ffn_out" />
+                <input src="ln1$layer_norm_out" />
+                <output name="attended_added2" />
+            </node>
+            <export from="attended_added2" />
+        </block>
+
+        <node name="LN2_Placeholder" op="Identity">
+            <input src="attended_added2" />
+            <output name="ln2$input" />
+        </node>
+        <block src="layer_norm.agr" name="ln2" />
+
+        <export from="ln2$layer_norm_out" />
+    </block>
+
+    <export from="ln2$layer_norm_out" dim="[var(ntokens), var(dmodel)]" />
+</model>

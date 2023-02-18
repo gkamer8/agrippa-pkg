@@ -1,0 +1,94 @@
+<model script-version="0.0.1">
+
+    <import from="decoder_tokens" dim="[var(ntokens), var(nvocab)]" />
+    <import from="encoder_tokens" dim="[var(ntokens), var(nvocab)]" />
+
+    <import from="decoder_mask" dim="[var(ntokens), var(ntokens)]" />
+    <import from="encoder_mask" dim="[var(ntokens), var(ntokens)]" />
+
+    <import from="dec_posembedmatrix" dim="[var(ntokens), var(dmodel)]" />
+    <import from="enc_posembedmatrix" dim="[var(ntokens), var(dmodel)]" />
+
+    <import from="encoder_output_mask" dim="[var(ntokens), var(dmodel)]" />
+    <import from="decoder_embed_removal_mask" dim="[var(ntokens), var(dmodel)]" />
+
+
+    <block title="EmbedPlaceholder">
+        <node op="Identity">
+            <params name="EmbedW" dim="[var(nvocab), var(dmodel)]" />
+            <output name="Embed" />
+        </node>
+    </block>
+
+    <block title="EncoderPlaceholders">
+        <node op="Identity">
+            <input src="Embed" />
+            <output name="encoder$Embed" />
+        </node>
+        <node op="Identity">
+            <input src="encoder_mask" />
+            <output name="encoder$mask" />
+        </node>
+        <node op="Identity">
+            <input src="encoder_tokens" />
+            <output name="encoder$tokens" />
+        </node>
+        <node op="Identity">
+            <input src="enc_posembedmatrix" />
+            <output name="encoder$posembedmatrix" />
+        </node>
+    </block>
+    <block src="encoder.agr" name="encoder" title="Encoder" />
+
+    <block title="DecoderPlaceholders">
+        <node op="Identity">
+            <input src="Embed" />
+            <output name="decoder$Embed" />
+        </node>
+        <node op="Identity">
+            <input src="decoder_mask" />
+            <output name="decoder$mask" />
+        </node>
+        <node op="Identity">
+            <input src="decoder_tokens" />
+            <output name="decoder$tokens" />
+        </node>
+        <node op="Identity">
+            <input src="dec_posembedmatrix" />
+            <output name="decoder$posembedmatrix" />
+        </node>
+        <node op="Identity">
+            <input src="encoder$ln2$layer_norm_out" />
+            <output name="decoder$encoder_output" />
+        </node>
+        <node op="Identity">
+            <input src="encoder_output_mask" />
+            <output name="decoder$encoder_output_mask" />
+        </node>
+        <node op="Identity">
+            <input src="decoder_embed_removal_mask" />
+            <output name="decoder$decoder_embed_removal_mask" />
+        </node>
+    </block>
+    <block src="decoder.agr" name="decoder" title="Decoder" />
+
+    <block title="GetRevEmbedWeights">
+        <import from="Embed" />
+        <node op="Transpose">
+            <input src="Embed" />
+            <output name="RevEmbed" />
+        </node>
+        <export from="RevEmbed" />
+    </block>
+
+    <block title="Linear">
+        <node op="MatMul">
+            <input src="decoder$ln2$layer_norm_out" dim="[var(ntokens), var(dmodel)]" />
+            <input src="RevEmbed" dim="[var(dmodel), var(nvocab)]" />
+            <output name="end_linear_decoder" dim="[var(ntokens), var(nvocab)]" />
+        </node>
+    </block>
+
+    <export from="end_linear_decoder" dim="[var(ntokens), var(nvocab)]" />
+
+</model>

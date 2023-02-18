@@ -1,0 +1,4 @@
+__pycache__
+*.onnx
+log.json
+model/*.pkl

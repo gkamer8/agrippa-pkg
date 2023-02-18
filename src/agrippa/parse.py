@@ -424,6 +424,7 @@ def export(
                     init_type = _resolve_attr(param.attrib['init'], bindings, expect_value=False)
                 except:
                     init_type = DEFAULT_INIT_TYPE
+                
                 try:
                     init_args = _resolve_attr(param.attrib['init_args'], bindings, expect_value=True)
                 except:
