@@ -402,10 +402,9 @@ def export(
                     continue
                 # Note: order can be important!
                 # Each op type specifies the order in which inputs are meant to be included
-                orig_name = _resolve_attr(param.attrib['name'], bindings, expect_value=False)
+                param_orig_name = _resolve_attr(param.attrib['name'], bindings, expect_value=False)
                 if imp_name is not None:
-                    orig_name = make_imported_name(orig_name, imp_name)
-                name = orig_name
+                    param_orig_name = make_imported_name(param_orig_name, imp_name)
 
                 try:
                     shared = _resolve_attr(param.attrib['shared'], bindings, expect_value=False)
@@ -430,29 +429,25 @@ def export(
                 except:
                     init_args = None
 
-                orig_name = _resolve_attr(param.attrib['name'], bindings, expect_value=False)
-
                 # If the parameter is frozen, add "$constant" to the name
                 try:
                     frozen = _resolve_attr(param.attrib['frozen'], bindings, expect_value=False)
                 except:
                     frozen = "no"
                 if frozen == "yes":
-                    orig_name += "$constant"
-
-                name = orig_name
+                    param_orig_name += "$constant"
                 
                 if shared == "no":
-                    name = get_unique_param_name(orig_name)
-                    param_onnx = _resolve_param(name, ONNX_TYPE_DICT[dtype], dim, weights, init_type=init_type, init_args=init_args)
+                    param_orig_name = get_unique_param_name(param_orig_name)
+                    param_onnx = _resolve_param(param_orig_name, ONNX_TYPE_DICT[dtype], dim, weights, init_type=init_type, init_args=init_args)
                     all_inits.append(param_onnx)
                 else:
                     # First time we see it, even if we keep the name, need to initialize
-                    if name not in parameter_repeats:
+                    if param_orig_name not in parameter_repeats:
                         param_onnx = _resolve_param(name, ONNX_TYPE_DICT[dtype], dim, weights, init_type=init_type, init_args=init_args)
                         all_inits.append(param_onnx)
-                        parameter_repeats[name] = 1  # so we don't do this next time
-                params.append(name)
+                        parameter_repeats[param_orig_name] = 1  # so we don't do this next time
+                params.append(param_orig_name)
 
             kwargs = {}
 

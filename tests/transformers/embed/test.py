@@ -73,6 +73,8 @@ if __name__ == '__main__':
         agrippa.export(proj_folder, "decoder.onnx", index="inference_dec.agr", bindings=bindings, reinit=reinit_model, suppress=False)
         agrippa.export(proj_folder, "encoder.onnx", index="inference_enc.agr", bindings=bindings, reinit=reinit_model, suppress=False)
 
+        agrippa.export(proj_folder, "transformer.onnx", index="transformer.agr", bindings=bindings, reinit=reinit_model, suppress=False)
+
     dec_ort_sess = ort.InferenceSession('decoder.onnx', providers=['CPUExecutionProvider'])
     enc_ort_sess = ort.InferenceSession('encoder.onnx', providers=['CPUExecutionProvider'])
 
@@ -96,9 +98,9 @@ if __name__ == '__main__':
 
     dec_posembedmatrix = get_posembeddings(isDecoder=True)
 
-    for i, data in enumerate(load_data(split="test", batch_size=20)):
+    for i, data in enumerate(load_data(split="test", batch_size=2)):
 
-        use_batch_index = 19  # which example in the batch are we using
+        use_batch_index = 0  # which example in the batch are we using
 
         print("Example:")
         print(get_str_from_ids(data[use_batch_index]))
@@ -161,18 +163,18 @@ if __name__ == '__main__':
         decoder_out = torch.tensor(decoder_out)
 
         print(decoder_out)
+        print(decoder_out.shape)
 
         topk = torch.topk(decoder_out, k=10, dim=1)[1]  # gets indices of top k in tensor of shape (seq length, 2)
-        tops = topk[:, 9].flatten()
+        tops = topk[:, 1].flatten()
 
         print(tops)
         print(tops.shape)
-        exit(0)
 
-        print()
-        print("Top choice of translated output:")
+        torch_model = agrippa.onnx_to_torch("transformer.onnx")
+        outputs = torch_model(right_shifted, encoder_tokens, decoder_mask, zeros_mask,
+                                dec_posembedmatrix, enc_posembedmatrix,
+                                encoder_output_mask, decoder_embed_removal_mask)
+        print(outputs)
 
-        print(get_str_from_ids(tops))
-
-        print(encoder_out)
         exit(0)

@@ -79,7 +79,7 @@ if __name__ == '__main__':
 
     reinit_model = False
     # Convert xml to onnx
-    agrippa.export(proj_folder, onnx_fname, index="transformer.agr", bindings=bindings, reinit=reinit_model, suppress=True)
+    agrippa.export(proj_folder, onnx_fname, index="transformer.agr", bindings=bindings, reinit=reinit_model, suppress=False)
     print("Exported")
 
     # Now we train

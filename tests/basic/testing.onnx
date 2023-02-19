@@ -1,31 +1,71 @@
-Unknown:ş
-
-inputyGenericNode$1"Relu
-!
-input2y2GenericNode$2"Relu
-!
-input3y3GenericNode$3"ReluUnknownZ
+Unknown:”
+A
+inputmeansGet Row Means$1"
+ReduceMean*
+axes@ÿÿÿÿÿÿÿÿÿ 
+,
+input
+meanscenteredCenter Rows$1"Sub
+=
+centered
+centeredsquaredSquare Rows Elementwise$1"Mul
+K
+squaredsigma_squaredFind Variance$1"
+ReduceMean*
+axes@ÿÿÿÿÿÿÿÿÿ 
+*
+sigma_squaredsigmaFind Stdev$1"Sqrt
+4
+gain$1
+sigmagainsReduce Gains By Stdev$1"Div
+-
+centered
+gainsgainedApply Gains$1"Mul
+7
+gained
+biases$1layer_norm_outApply Biases$1"AddUnknown*"">9@-¿Ò Ê¿»‚vÀJÌO@Bgain$1*&"–ƒ?-?#¨¨>»e¿Õ¾Bbiases$1Z
 input
 
-
-Z
-input2
+
+
+b 
+layer_norm_out
 
-
-Z
-input3
+
+
+j
+means
 
-
-b
-y
+
+
+j
+centered
 
-
-b
-y2
+
+
+j
+squared
 
-
-b
-y3
+
+
+j
+sigma_squared
 
-
-B
+
+
+j
+sigma
+
+
+
+j
+gains
+
+
+
+j
+gained
+
+
+
+B

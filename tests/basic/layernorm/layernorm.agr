@@ -25,7 +25,7 @@
             <output name="sigma" />
         </node>
         <node op="Div" title="Reduce Gains By Stdev">
-            <params name="gain" dim="[1, 5]" />
+            <params name="gain" dim="[5]" />
             <input src="sigma" />
             <output name="gains" />
         </node>

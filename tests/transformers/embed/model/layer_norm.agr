@@ -32,11 +32,11 @@
         <node op="Div">
             <params name="gain" dim="[1, var(dmodel)]" init="ones" />
             <input src="sigma" />
-            <output name="gain" />
+            <output name="proper_gain" />
         </node>
         <node op="Mul">
             <input src="centered" />
-            <input src="gain" />
+            <input src="proper_gain" />
             <output name="gained" />
         </node>
         <node op="Add">
