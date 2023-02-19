@@ -93,7 +93,7 @@ if __name__ == '__main__':
     proto_mask = torch.full((BATCH_SIZE, bindings['ntokens'], bindings['ntokens']), -float("inf"))
     proto_mask[:] = torch.triu(proto_mask[0], diagonal=1)    
     proto_mask[:, :, -1] = 0.  # in decoder, every token can see the last one (doc embedding)
-    proto_mask[:, -1, -1:] = -float("inf")  # but the doc embedding can only see itself
+    proto_mask[:, -1, :-1] = -float("inf")  # but the doc embedding can only see itself
     decoder_mask = proto_mask.to(device)
 
     zeros_mask = torch.full((BATCH_SIZE, bindings['ntokens'], bindings['ntokens']), 0.).to(device)

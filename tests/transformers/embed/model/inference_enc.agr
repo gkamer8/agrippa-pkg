@@ -1,0 +1,36 @@
+<model script-version="0.0.1">
+
+    <import from="encoder_tokens" dim="[var(ntokens), var(nvocab)]" />
+    <import from="encoder_mask" dim="[var(ntokens), var(ntokens)]" />
+    <import from="enc_posembedmatrix" dim="[var(ntokens), var(dmodel)]" />
+
+    <block title="EmbedPlaceholder">
+        <node op="Identity">
+            <params name="EmbedW" dim="[var(nvocab), var(dmodel)]" />
+            <output name="Embed" />
+        </node>
+    </block>
+
+    <block title="EncoderPlaceholders">
+        <node op="Identity">
+            <input src="Embed" />
+            <output name="encoder$Embed" />
+        </node>
+        <node op="Identity">
+            <input src="encoder_mask" />
+            <output name="encoder$mask" />
+        </node>
+        <node op="Identity">
+            <input src="encoder_tokens" />
+            <output name="encoder$tokens" />
+        </node>
+        <node op="Identity">
+            <input src="enc_posembedmatrix" />
+            <output name="encoder$posembedmatrix" />
+        </node>
+    </block>
+    <block src="encoder.agr" name="encoder" title="Encoder" />
+
+    <export from="encoder$ln2$layer_norm_out" dim="[var(ntokens), var(dmodel)]" />
+
+</model>
