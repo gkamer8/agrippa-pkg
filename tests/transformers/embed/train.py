@@ -57,18 +57,19 @@ def get_posembeddings(isDecoder=False):
     for pos in range(len(posembeddingmatrix[0])):
         for i in range(len(posembeddingmatrix[0][0])):
 
+            real_pos = pos
             # In decoder, the last one is the document embedding, which should be embedded as being first
             if isDecoder:
                 if pos == len(posembeddingmatrix[0]) - 1:
-                    pos = 0
+                    real_pos = 0
                 else:
-                    pos += 1
+                    real_pos += 1
 
             # Even indices get one thing, odd the other
             if i % 2 == 0:
-                posembeddingmatrix[:, pos, i] = math.sin(pos/(10_000**(i/bindings['dmodel'])))
+                posembeddingmatrix[:, pos, i] = math.sin(real_pos/(10_000**(i/bindings['dmodel'])))
             else:
-                posembeddingmatrix[:, pos, i] = math.cos(pos/(10_000**(i/bindings['dmodel'])))
+                posembeddingmatrix[:, pos, i] = math.cos(real_pos/(10_000**(i/bindings['dmodel'])))
 
     posembeddingmatrix = posembeddingmatrix.to(device)
     return posembeddingmatrix
@@ -76,7 +77,7 @@ def get_posembeddings(isDecoder=False):
 
 if __name__ == '__main__':
 
-    reinit_model = True
+    reinit_model = False
     # Convert xml to onnx
     agrippa.export(proj_folder, onnx_fname, index="transformer.agr", bindings=bindings, reinit=reinit_model, suppress=True)
     print("Exported")
@@ -92,6 +93,7 @@ if __name__ == '__main__':
     proto_mask = torch.full((BATCH_SIZE, bindings['ntokens'], bindings['ntokens']), -float("inf"))
     proto_mask[:] = torch.triu(proto_mask[0], diagonal=1)    
     proto_mask[:, :, -1] = 0.  # in decoder, every token can see the last one (doc embedding)
+    proto_mask[:, -1, -1:] = -float("inf")  # but the doc embedding can only see itself
     decoder_mask = proto_mask.to(device)
 
     zeros_mask = torch.full((BATCH_SIZE, bindings['ntokens'], bindings['ntokens']), 0.).to(device)
@@ -183,7 +185,7 @@ if __name__ == '__main__':
             outputs = torch_model(right_shifted, encoder_tokens, decoder_mask, zeros_mask,
                                 dec_posembeddingmatrix, enc_posembeddingmatrix,
                                 encoder_output_mask, decoder_embed_removal_mask).to(device)
-            
+
             # Loss function expects labels in the form (Batch size, # Classes, other dimensions...)
             train_output = outputs.permute((0, 2, 1))
 

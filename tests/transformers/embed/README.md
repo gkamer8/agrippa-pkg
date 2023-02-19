@@ -22,3 +22,8 @@ For seq=100, good batch size seems like 128
 
 Scales embeddings up by sqrt(dmodel) for input. It's a post-LN architecture. All in all pretty normal.
 
+## Dataset
+
+Dataset is from wikitext in hugging face datasets
+
+In total, it's about 9000 batches of size 128 w/ seq length=100

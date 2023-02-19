@@ -12,11 +12,11 @@ const_zeros = torch.zeros((BATCH_SIZE, SEQ_LENGTH)).to(device)
 
 
 # Yields batches of [list of input_ids] (tokens) - batches are in first dimension
-def load_data(split="train"):
+def load_data(split="train", batch_size=BATCH_SIZE):
 
     dataset = load_dataset("wikitext", "wikitext-103-v1")
 
-    batch = torch.empty((BATCH_SIZE, SEQ_LENGTH)).to(device)
+    batch = torch.empty((batch_size, SEQ_LENGTH)).to(device)
     batch_i = 0  # where we are in adding the thing to the batch
     accum = []  # current sequence to be added
     for example in dataset[split]:
@@ -30,9 +30,9 @@ def load_data(split="train"):
             accum = accum[SEQ_LENGTH:]
             batch_i += 1
 
-        if batch_i >= BATCH_SIZE:
+        if batch_i >= batch_size:
             yield batch
-            batch = torch.empty((BATCH_SIZE, SEQ_LENGTH)).to(device)
+            batch = torch.empty((batch_size, SEQ_LENGTH)).to(device)
             batch_i = 0
 
     print(f"Done with all data")
