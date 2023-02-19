@@ -65,15 +65,12 @@ def get_posembeddings(isDecoder=False):
 if __name__ == '__main__':
 
     reinit_model = False
-
-    re_export = True
+    re_export = False
 
     if re_export:
         # Export inference decoder
         agrippa.export(proj_folder, "decoder.onnx", index="inference_dec.agr", bindings=bindings, reinit=reinit_model, suppress=False)
         agrippa.export(proj_folder, "encoder.onnx", index="inference_enc.agr", bindings=bindings, reinit=reinit_model, suppress=False)
-
-        agrippa.export(proj_folder, "transformer.onnx", index="transformer.agr", bindings=bindings, reinit=reinit_model, suppress=False)
 
     dec_ort_sess = ort.InferenceSession('decoder.onnx', providers=['CPUExecutionProvider'])
     enc_ort_sess = ort.InferenceSession('encoder.onnx', providers=['CPUExecutionProvider'])
@@ -166,15 +163,15 @@ if __name__ == '__main__':
         print(decoder_out.shape)
 
         topk = torch.topk(decoder_out, k=10, dim=1)[1]  # gets indices of top k in tensor of shape (seq length, 2)
-        tops = topk[:, 1].flatten()
+        tops = topk[:, 0].flatten()
 
-        print(tops)
         print(tops.shape)
 
-        torch_model = agrippa.onnx_to_torch("transformer.onnx")
-        outputs = torch_model(right_shifted, encoder_tokens, decoder_mask, zeros_mask,
-                                dec_posembedmatrix, enc_posembedmatrix,
-                                encoder_output_mask, decoder_embed_removal_mask)
-        print(outputs)
+        print("(actual) : (prediction)")
+        for i in range(SEQ_LENGTH):
+            actual = get_str_from_ids([data[use_batch_index][i]])
+            predicted = get_str_from_ids([tops[i]])
+            txt = f"({actual}) : ({predicted})"
+            print(txt)
 
         exit(0)
