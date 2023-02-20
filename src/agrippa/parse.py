@@ -1,6 +1,7 @@
 from math import exp
 from xml.dom import SyntaxErr
 import xml.etree.ElementTree as ET
+from matplotlib.pyplot import axes
 import onnx
 import json
 import numpy as np
@@ -13,7 +14,8 @@ WEIGHTS_FNAME = "weights.pkl"
 META_FNAME = "meta.json"
 
 ONNX_TYPE_DICT = {
-    "float32": onnx.TensorProto.FLOAT
+    "float32": onnx.TensorProto.FLOAT,
+    "int64": onnx.TensorProto.INT64
 }
 
 DEFAULT_TYPE = "float32"
@@ -94,7 +96,7 @@ Options for init_type are:
 - init_args takes parameterizations of those initialization types
 See the README for more info
 """
-def _resolve_param(name, data_type, dims, weights, init_type=DEFAULT_INIT_TYPE, init_args=None):
+def _resolve_param(name, data_type, dims, weights, init_type=DEFAULT_INIT_TYPE, init_args=None, hidden=False):
     if name in weights:
         try:
             tens = weights[name]
@@ -107,7 +109,8 @@ def _resolve_param(name, data_type, dims, weights, init_type=DEFAULT_INIT_TYPE, 
         except:
             _notify(f"Error loading weight {name}; arbitrarily initializing.")
 
-    _notify(f"Weight {name} not found; initializing")
+    if not hidden:
+        _notify(f"Weight {name} not found; initializing")
     if init_type == 'xavier':
         # Get the sum of the last two dimensions
         # If there is only one, use just that one
@@ -512,7 +515,20 @@ def export(
                     pass
                 inputs = splice_inputs(inputs, params, param_precedence)
                 if len(inputs) > 1:
-                    raise SyntaxWarning(f"Softmax should only have one input, yet it has {len(inputs)}")
+                    raise SyntaxWarning(f"ReduceMean should only have one input, yet it has {len(inputs)}")
+            elif op == "ReduceSum":
+                if len(inputs) != 1:
+                    raise SyntaxWarning(f"ReduceSum should have one input, yet it has {len(inputs)}")                
+                axes = _resolve_attr(node.attrib['axes'], bindings, expect_value=True)
+                axes_name = inputs[0] + "$axes" + "$constant"
+                tens = _resolve_param(axes_name, ONNX_TYPE_DICT['int64'], [len(axes)], weights, init_type="constant", init_args=[axes], hidden=True)
+                all_inits.append(tens)
+                try:
+                    kwargs["keepdims"] = _resolve_attr(node.attrib['keepdims'], bindings, expect_value=True)
+                except KeyError:
+                    # Default is 1 (used to be a notify - don't put a notify here, it's jank)
+                    pass
+                inputs = inputs + [axes_name]
             elif op == "Sub":
                 inputs = splice_inputs(inputs, params, param_precedence)
                 if len(inputs) != 2:

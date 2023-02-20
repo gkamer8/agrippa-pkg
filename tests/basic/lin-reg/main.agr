@@ -6,11 +6,15 @@
             <input src="x" />
             <output name="wx" />
         </node>
-        <node op="Add" title="Apply Biases">
-            <params name="b" dim="[var(n)]" />
+        <node op="ReduceSum" axes="[0]">
             <input src="wx" />
+            <output name="wx_sum" />
+        </node>
+        <node op="Add" title="Apply Bias">
+            <params name="b" dim="[1]" />
+            <input src="wx_sum" />
             <output name="y" />
         </node>
     </block>
-    <export from="y" dim="[var(n)]" />
+    <export from="y" dim="[1]" />
 </model>

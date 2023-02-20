@@ -23,11 +23,11 @@ agrippa.export(proj_name, 'testing.onnx', bindings=bindings, suppress=True)
 torch_model = agrippa.onnx_to_torch(onnx_out)
 
 target_weights = torch.rand((bindings['n'],))
-target_biases = torch.rand((bindings['n'],))
+target_bias = torch.rand((1,))
 
 def get_pair():
     x = torch.rand((bindings['n'],))
-    y = target_weights * x + target_biases
+    y = torch.sum(target_weights * x) + target_bias
     return x, y
 
 optimizer = torch.optim.SGD(torch_model.parameters(), lr=0.1)
@@ -58,8 +58,8 @@ weights = agrippa.utils.find_params("W", proj_name)
 print(f"Target weights: {target_weights}")
 print(f"Actual weights: {weights}")
 print()
-print(f"Target biases: {target_biases}")
-print(f"Actual biases: {biases}")
+print(f"Target bias: {target_bias}")
+print(f"Actual bias: {biases}")
 
 agrippa.export(proj_name, 'testing.onnx', bindings=bindings, reinit=False)
 

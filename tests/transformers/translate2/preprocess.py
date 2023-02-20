@@ -38,9 +38,11 @@ def tokenize_and_pad(example):
     return example
 
 # Yields (other language batch, english batch) each of shape (BATCH_SIZE, SEQ_LENGTH)
-def load_data(split="train"):
+def load_data(split="train", shuffle=True):
 
-    dataset = load_dataset("wmt14", f"{other_lang}-en").shuffle()
+    dataset = load_dataset("wmt14", f"{other_lang}-en")
+    if shuffle:
+        dataset = dataset.shuffle()
 
     batch_en = torch.empty((BATCH_SIZE, SEQ_LENGTH)).to(device)
     batch_other = torch.empty((BATCH_SIZE, SEQ_LENGTH)).to(device)

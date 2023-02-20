@@ -62,10 +62,26 @@ def get_posembeddings(isDecoder=False):
     posembeddingmatrix = posembeddingmatrix.to(device)
     return posembeddingmatrix
 
+
+def get_tokens(data, batch_index):
+    chopped = data[batch_index, :-1]
+    to_cat = torch.full((1,), bos_token).to(device)
+    right_shifted_ids = torch.cat((to_cat, chopped), -1).to(torch.int64)
+    right_shifted = F.one_hot(right_shifted_ids.to(torch.int64), num_classes=bindings['nvocab']).float()
+    # Add summarize token to end
+    encoder_chopped = right_shifted_ids[:-1]
+    to_cat = torch.full((1,), sum_token).to(device)
+    encoder_tokens_ids = torch.cat((encoder_chopped, to_cat), -1).to(torch.int64)
+    encoder_tokens = F.one_hot(encoder_tokens_ids.to(torch.int64), num_classes=bindings['nvocab']).float()
+
+    # encoder tokens, decoder tokens
+    return (encoder_tokens, right_shifted)
+
+
 if __name__ == '__main__':
 
     reinit_model = False
-    re_export = False
+    re_export = True
 
     if re_export:
         # Export inference decoder
@@ -95,55 +111,19 @@ if __name__ == '__main__':
 
     dec_posembedmatrix = get_posembeddings(isDecoder=True)
 
-    for i, data in enumerate(load_data(split="test", batch_size=2)):
+    for i, data in enumerate(load_data(split="test", batch_size=100)):
 
         use_batch_index = 0  # which example in the batch are we using
+        anti_batch_index = 98
 
         print("Example:")
         print(get_str_from_ids(data[use_batch_index]))
+        print()
+        print("Anti-example:")
+        print(get_str_from_ids(data[anti_batch_index]))
 
-        chopped = data[use_batch_index, :-1]
-        to_cat = torch.full((1,), bos_token).to(device)
-        right_shifted_ids = torch.cat((to_cat, chopped), -1).to(torch.int64)
-        right_shifted = F.one_hot(right_shifted_ids.to(torch.int64), num_classes=bindings['nvocab']).float()
-        # Add summarize token to end
-        encoder_chopped = right_shifted_ids[:-1]
-        to_cat = torch.full((1,), sum_token).to(device)
-        encoder_tokens_ids = torch.cat((encoder_chopped, to_cat), -1).to(torch.int64)
-        encoder_tokens = F.one_hot(encoder_tokens_ids.to(torch.int64), num_classes=bindings['nvocab']).float()
-
-        """
-
-        # Decoder inputs:
-
-        <import from="decoder_tokens" dim="[var(ntokens), var(nvocab)]" />
-        <import from="encoder_output" dim="[var(ntokens), var(dmodel)]" />
-
-        <import from="decoder_mask" dim="[var(ntokens), var(ntokens)]" />
-
-        <import from="dec_posembedmatrix" dim="[var(ntokens), var(dmodel)]" />
-
-        <import from="encoder_output_mask" dim="[var(ntokens), var(dmodel)]" />
-        <import from="decoder_embed_removal_mask" dim="[var(ntokens), var(dmodel)]" />
-        
-        # Decoder outputs:
-
-        <export from="end_linear_decoder" dim="[var(ntokens), var(nvocab)]" />
-
-        """
-
-        """
-
-        # Encoder inputs:
-
-        <import from="encoder_tokens" dim="[var(ntokens), var(nvocab)]" />
-        <import from="encoder_mask" dim="[var(ntokens), var(ntokens)]" />
-        <import from="enc_posembedmatrix" dim="[var(ntokens), var(dmodel)]" />
-
-        # Encoder outputs:
-        <export from="encoder$ln2$layer_norm_out" dim="[var(ntokens), var(dmodel)]" />
-
-        """
+        encoder_tokens, right_shifted = get_tokens(data, use_batch_index)
+        anti_encoder_tokens, anti_right_shifted = get_tokens(data, anti_batch_index)
 
         encoder_out = enc_ort_sess.run(None, {'encoder_tokens': encoder_tokens.cpu().detach().numpy(),
                                         'encoder_mask': zeros_mask.cpu().detach().numpy(),
@@ -159,14 +139,40 @@ if __name__ == '__main__':
 
         decoder_out = torch.tensor(decoder_out)
 
-        print(decoder_out)
-        print(decoder_out.shape)
 
         topk = torch.topk(decoder_out, k=10, dim=1)[1]  # gets indices of top k in tensor of shape (seq length, 2)
         tops = topk[:, 0].flatten()
 
-        print(tops.shape)
+        print("True example:")
+        print("(actual) : (prediction)")
+        for i in range(SEQ_LENGTH):
+            actual = get_str_from_ids([data[use_batch_index][i]])
+            predicted = get_str_from_ids([tops[i]])
+            txt = f"({actual}) : ({predicted})"
+            print(txt)
 
+        print()
+
+        encoder_out = enc_ort_sess.run(None, {'encoder_tokens': anti_encoder_tokens.cpu().detach().numpy(),
+                                        'encoder_mask': zeros_mask.cpu().detach().numpy(),
+                                        'enc_posembedmatrix': enc_posembedmatrix.cpu().detach().numpy()})[0]
+
+        # Give it the anti encoder output but use the real example tokens in the decoder
+        decoder_out = dec_ort_sess.run(None, {'decoder_tokens': right_shifted.cpu().detach().numpy(),
+                                        'encoder_output': encoder_out,
+                                        'decoder_mask': decoder_mask.cpu().detach().numpy(),
+                                        'dec_posembedmatrix': dec_posembedmatrix.cpu().detach().numpy(),
+                                        'encoder_output_mask': encoder_output_mask.cpu().detach().numpy(),
+                                        'decoder_embed_removal_mask': decoder_embed_removal_mask.cpu().detach().numpy()
+                                        })[0]
+
+        decoder_out = torch.tensor(decoder_out)
+
+
+        topk = torch.topk(decoder_out, k=10, dim=1)[1]  # gets indices of top k in tensor of shape (seq length, 2)
+        tops = topk[:, 0].flatten()
+
+        print("Anti-example:")
         print("(actual) : (prediction)")
         for i in range(SEQ_LENGTH):
             actual = get_str_from_ids([data[use_batch_index][i]])

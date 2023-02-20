@@ -60,7 +60,7 @@ if __name__ == '__main__':
     max_len = 0
     german = ""
     english = ""
-    other_batch, english_batch = next(load_data())
+    other_batch, english_batch = next(load_data(shuffle=False))
 
     rand_row = random.randrange(len(other_batch))
 
@@ -126,7 +126,7 @@ if __name__ == '__main__':
             outputs.append(current)
 
         candidates, scores = beam_decode(outputs, candidates, scores, pos=i, k=k)
-        if i % 5 == 0:
+        if i % 10 == 0:
             print(f"At i={i}")
             best_generation = candidates[max(range(len(scores)), key=lambda i: scores[i])]
             print(get_str_from_ids(best_generation))
