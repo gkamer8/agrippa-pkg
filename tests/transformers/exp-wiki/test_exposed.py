@@ -19,7 +19,7 @@ onnx_fname = "test-decoder.onnx"
 
 txt = """Abraham Lincoln was an American lawyer, politician, and a Republican"""
 # token length matched for convenience
-txt2 = "Joseph R Biden was an American lawyer, politician, and a Democrat"
+txt2 = "Joe Biden was an American lawyer, politician, and a Democrat President"
 
 tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
 tokens = tokenizer(txt)['input_ids']
@@ -41,7 +41,7 @@ bindings = {
 }
 
 # Change weight
-DEL_WEIGHTS = True
+DEL_WEIGHTS = False
 if DEL_WEIGHTS:
     weight_dict = {}
     with open("model/weights.pkl", 'rb') as fhand: 
@@ -169,7 +169,7 @@ for l in range(1, 7):
     print("For Biden:")
     print()
     for i in range(len(tokens)):
-        prob = round(torch.exp(outputs2[output_num][token_pos][tokens[i]]).item() / torch.sum(torch.exp(outputs2[output_num][-1])).item(), 5)
+        prob = round(torch.exp(outputs2[output_num][-2][tokens[i]]).item() / torch.sum(torch.exp(outputs2[output_num][-2])).item(), 5)
         print(f"{token_labs[i]}: {prob}")
 
 

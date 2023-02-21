@@ -17,6 +17,7 @@ from data_constants import BATCH_SIZE, SEQ_LENGTH, bos_token, device, sum_token
 from preprocess import load_data, get_str_from_ids, tokenizer
 import torch.nn
 import pickle
+from scipy.stats import pearsonr
 
 proj_folder = "model"
 
@@ -68,10 +69,10 @@ def get_posembeddings(isDecoder=False):
 def process_sentence(token_ids):        
     # Pad by repeating
     # The plus 2 is for BOS and SUM 
-    need_to_pad = SEQ_LENGTH - (len(sentence1_tokens) + 2)
+    need_to_pad = SEQ_LENGTH - (len(token_ids) + 2)
     assert(need_to_pad > 0)
 
-    padded_tokens = (sentence1_tokens * SEQ_LENGTH)[:SEQ_LENGTH-2]
+    padded_tokens = (token_ids * SEQ_LENGTH)[:SEQ_LENGTH-2]
     
     padded_tokens = [bos_token] + padded_tokens + [sum_token]
     assert(len(padded_tokens) == SEQ_LENGTH)
@@ -82,8 +83,9 @@ def process_sentence(token_ids):
 
 if __name__ == '__main__':
 
+    recalculate = False
     reinit_model = False
-    re_export = True
+    re_export = False
 
     if re_export:
         agrippa.export(proj_folder, "encoder.onnx", index="inference_enc.agr", bindings=bindings, reinit=reinit_model, suppress=False)
@@ -106,36 +108,46 @@ if __name__ == '__main__':
 
     sim_scores = []
 
-    for i in range(len(sentences1)):
+    if recalculate:
 
-        if i % 100 == 0:
-            print(f"At i = {i}/{len(sentences1)}")
+        for i in range(len(sentences1)):
 
-        sentence1_tokens = tokenizer(sentences1[i])['input_ids']
-        sentence2_tokens = tokenizer(sentences2[i])['input_ids']
+            if i % 100 == 0:
+                print(f"At i = {i}/{len(sentences1)}")
 
-        encoder_tokens1 = process_sentence(sentence1_tokens)
-        encoder_tokens2 = process_sentence(sentence2_tokens)
+            sentence1_tokens = tokenizer(sentences1[i])['input_ids']
+            sentence2_tokens = tokenizer(sentences2[i])['input_ids']
 
-        encoder_out1 = enc_ort_sess.run(None, {'encoder_tokens': encoder_tokens1.cpu().detach().numpy(),
-                                        'encoder_mask': zeros_mask.cpu().detach().numpy(),
-                                        'enc_posembedmatrix': enc_posembedmatrix.cpu().detach().numpy()})[0]
+            encoder_tokens1 = process_sentence(sentence1_tokens)
+            encoder_tokens2 = process_sentence(sentence2_tokens)
 
-        encoder_out2 = enc_ort_sess.run(None, {'encoder_tokens': encoder_tokens2.cpu().detach().numpy(),
-                                        'encoder_mask': zeros_mask.cpu().detach().numpy(),
-                                        'enc_posembedmatrix': enc_posembedmatrix.cpu().detach().numpy()})[0]
+            encoder_out1 = enc_ort_sess.run(None, {'encoder_tokens': encoder_tokens1.cpu().detach().numpy(),
+                                            'encoder_mask': zeros_mask.cpu().detach().numpy(),
+                                            'enc_posembedmatrix': enc_posembedmatrix.cpu().detach().numpy()})[0]
 
-        embedding1 = torch.tensor(encoder_out1[-1])
-        embedding2 = torch.tensor(encoder_out2[-1])
+            encoder_out2 = enc_ort_sess.run(None, {'encoder_tokens': encoder_tokens2.cpu().detach().numpy(),
+                                            'encoder_mask': zeros_mask.cpu().detach().numpy(),
+                                            'enc_posembedmatrix': enc_posembedmatrix.cpu().detach().numpy()})[0]
 
-        # Calculate cosine similarity
+            embedding1 = torch.tensor(encoder_out1[-1])
+            embedding2 = torch.tensor(encoder_out2[-1])
 
-        x = torch.dot(embedding1, embedding2).item()
-        len1 = torch.sum(torch.dot(embedding1, embedding1)).item()
-        len2 = torch.sum(torch.dot(embedding2, embedding2)).item()
-        
-        similarity = x / (len1 * len2)
-        sim_scores.append(similarity)
+            # Calculate cosine similarity
+
+            x = torch.dot(embedding1, embedding2).item()
+            len1 = torch.sqrt(torch.sum(torch.dot(embedding1, embedding1))).item()
+            len2 = torch.sqrt(torch.sum(torch.dot(embedding2, embedding2))).item()
+            
+            similarity = x / (len1 * len2)
+            sim_scores.append(similarity)
+
+    else:
+        with open("results.pkl", "rb") as fhand:
+            data = pickle.load(fhand)
+            target_score = data[0]
+            sim_scores = data[1]
+
+    print(pearsonr(target_score, sim_scores))
 
     plt.scatter(target_score, sim_scores)
     plt.show()
