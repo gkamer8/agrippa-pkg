@@ -1,0 +1,50 @@
+<block>
+    <import from="input" />
+    <block title="LayerNorm">
+        <import from="input" />
+        <node op="ReduceMean" axes="[-1]">
+            <input src="input" />
+            <output name="means" />
+        </node>
+        <node op="Sub">
+            <input src="input" />
+            <input src="means" />
+            <output name="centered" />
+        </node>
+        <node op="Mul">
+            <input src="centered" />
+            <input src="centered" />
+            <output name="squared" />
+        </node>
+        <node op="ReduceMean" axes="[-1]">
+            <input src="squared" />
+            <output name="sigma_squared" />
+        </node>
+        <node op="Add">
+            <input src="sigma_squared" />
+            <params name="ln_eps" dim="[1]" frozen="yes" init="constant" init_args="[var(ln_eps)]" />
+            <output name="stable" />
+        </node>
+        <node op="Sqrt">
+            <input src="stable" />
+            <output name="sigma" />
+        </node>
+        <node op="Div">
+            <params name="gain" dim="[1, var(dmodel)]" init="ones" />
+            <input src="sigma" />
+            <output name="gained_sigma" />
+        </node>
+        <node op="Mul">
+            <input src="centered" />
+            <input src="gained_sigma" />
+            <output name="gained" />
+        </node>
+        <node op="Add">
+            <input src="gained" />
+            <params dim="[1, var(dmodel)]" name="biases" init="zeros" />
+            <output name="layer_norm_out" />
+        </node>
+        <export from="layer_norm_out" />
+    </block>
+    <export from="layer_norm_out" />
+</block>
